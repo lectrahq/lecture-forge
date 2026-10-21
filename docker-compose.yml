@@ -1,0 +1,109 @@
+# Lecture Audio Transcription Tool
+# Start / update everything:  docker compose up -d --build
+#
+# All settings come from ONE file: .env next to this file (see .env.example).
+# docker-compose reads it automatically. Each service below is handed only the
+# variables it actually needs, so a problem in one container cannot expose the
+# other's secrets.
+
+services:
+  # FastAPI backend: downloads, converts, transcribes and segments the audio.
+  backend:
+    build: ./backend
+    environment:
+      ELEVENLABS_API_KEY: ${ELEVENLABS_API_KEY:?set ELEVENLABS_API_KEY in .env}
+      YTDLP_COOKIES: ${YTDLP_COOKIES:-}
+      ASR_URL: http://asr:9000        # the local speech recognition service
+      PYTHONDONTWRITEBYTECODE: "1"   # it runs as a non-root user and cannot write to /app
+    # Runs as an ordinary user, not root: this container feeds untrusted input
+    # (downloaded videos, uploaded files) through yt-dlp and FFmpeg. 1000 is the
+    # 'squad' account on the VPS, which also makes data/ manageable without sudo.
+    user: "1000:1000"
+    volumes:
+      - ./data:/data                # audio, transcripts, segments and the SQLite DB
+      - ./tests:/app/tests:ro       # the regression suite, run with docker compose exec
+    ports:
+      - "127.0.0.1:8000:8000"       # only reachable from the VPS itself (for curl tests)
+    # Caps so one bad file cannot take the whole machine down with it.
+    # memswap_limit equal to mem_limit means this container gets NO swap: on
+    # cgroup v2 an unset value would quietly allow another 3g of swap on top.
+    # The backend normally uses ~64 MB, so reaching 3 GB means something is
+    # wrong, and swapping would only make the whole machine slow instead.
+    mem_limit: 2g
+    memswap_limit: 2g
+    cpus: 2.5
+    pids_limit: 512
+    restart: unless-stopped
+
+  # Local speech recognition: AI4Bharat IndicConformer on this server's processor.
+  # Free to use, so lectures can be transcribed without spending ElevenLabs credits.
+  # Not published to the internet - only the backend talks to it.
+  asr:
+    # Named explicitly so `docker compose up -d` reuses this 11 GB image instead of
+    # rebuilding it. Rebuild deliberately with:
+    #   docker build --network=host -f asr/Dockerfile -t lecture-asr:v1 .
+    image: lecture-asr:v1
+    build:
+      context: .
+      dockerfile: asr/Dockerfile
+    environment:
+      # The checkpoint is gated on Hugging Face, so this service needs that token -
+      # and nothing else. It never sees the website password or the ElevenLabs key.
+      HF_TOKEN: ${HF_TOKEN:-}
+      LANGUAGE_ID: ${LANGUAGE_ID:-ml}
+      # Writable cache locations. The container runs as an ordinary user and so
+      # cannot write next to the installed libraries; numba fails hard without this.
+      NUMBA_CACHE_DIR: /tmp/numba
+      XDG_CACHE_HOME: /tmp/cache
+      MPLCONFIGDIR: /tmp/mpl
+      HOME: /tmp                    # uid 1000 has no home here; lhotse writes into it
+    volumes:
+      - ./data:/data                # same audio files the backend writes
+      # The shared Python is mounted over the copies baked into the image, so a
+      # change takes effect with a restart instead of an 11 GB rebuild. The image
+      # still contains them, so it also works on its own.
+      - ./gpu/common.py:/app/common.py:ro
+      - ./backend/normalise.py:/app/normalise.py:ro
+      - ./asr/server.py:/app/server.py:ro
+    user: "1000:1000"
+    # PyTorch's data loader passes audio batches between processes through shared
+    # memory. Docker's default is 64 MB, which a real lecture exhausts within a
+    # second - the loader's workers die and take the whole service with them.
+    # Short test clips never show this, because they only make one batch.
+    shm_size: 1gb
+    # The model holds roughly 2 GB while a job runs; the rest is headroom so that
+    # a long lecture has somewhere to go before anything is killed.
+    mem_limit: 4g
+    memswap_limit: 4g
+    cpus: 2.5
+    pids_limit: 512
+    restart: unless-stopped
+
+  # Caddy web server. Its image is built from frontend/Dockerfile:
+  # stage 1 builds the React app with Node, stage 2 copies the result into Caddy.
+  # This one stays root because it binds ports 80 and 443.
+  caddy:
+    build: ./frontend
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"               # HTTP/3
+    environment:
+      DOMAIN: ${DOMAIN:?set DOMAIN in .env}
+      BASIC_AUTH_USER: ${BASIC_AUTH_USER:?set BASIC_AUTH_USER in .env}
+      BASIC_AUTH_HASH: ${BASIC_AUTH_HASH:?set BASIC_AUTH_HASH in .env}
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data            # HTTPS certificates (keep these, or Let's Encrypt may rate-limit you)
+      - caddy_config:/config
+    mem_limit: 512m
+    memswap_limit: 512m           # no swap for this container either
+    cpus: 1.0
+    pids_limit: 256
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  caddy_data:
+  caddy_config:

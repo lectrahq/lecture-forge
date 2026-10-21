@@ -1,0 +1,54 @@
+# Caddy: the public web server.
+# - gets and renews the HTTPS certificate automatically for {$DOMAIN}
+# - asks for a username/password (HTTP basic auth) on the whole site
+# - serves the built React website, and forwards /api/* to the FastAPI backend
+#
+# Values in {$...} come from the single root .env file (see docker-compose.yml).
+
+{$DOMAIN} {
+	basic_auth {
+		{$BASIC_AUTH_USER} {$BASIC_AUTH_HASH}
+	}
+
+	# Security headers. The site is one self-contained page with no external
+	# scripts, fonts or images, so everything can be locked to this origin.
+	header {
+		# Tell browsers to only ever reach this site over HTTPS.
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		# Do not let the browser guess a file's type from its contents.
+		X-Content-Type-Options "nosniff"
+		# Refuse to be embedded in a frame on another site (clickjacking).
+		X-Frame-Options "DENY"
+		# Do not leak the page address to other sites.
+		Referrer-Policy "no-referrer"
+		# Only allow scripts, styles and data from this site itself.
+		Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+	}
+
+	# Do not advertise which web server this is.
+	#
+	# This MUST stay on its own line rather than inside the block above. A header
+	# block that contains a deletion is deferred by Caddy until the response is
+	# written, and deferred headers never reach error responses - so folding this
+	# back into the block silently strips the security headers from every 401 and
+	# 404, which is exactly the login page a browser sees first. Verified by test.
+	header -Server
+
+	# Lecture recordings can be big.
+	request_body {
+		max_size 2GB
+	}
+
+	encode gzip
+
+	handle /api/* {
+		reverse_proxy backend:8000
+	}
+
+	# Everything else is the React single-page app.
+	handle {
+		root * /srv
+		try_files {path} /index.html
+		file_server
+	}
+}

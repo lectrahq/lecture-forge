@@ -1,0 +1,12 @@
+fastapi>=0.115
+uvicorn>=0.30
+python-multipart>=0.0.9
+python-dotenv>=1.0
+elevenlabs>=2.73
+# Word and character error rates for the ElevenLabs vs local-model comparison.
+jiwer>=3.0
+# yt-dlp is deliberately NOT pinned: YouTube changes often and old versions break.
+# Rebuild the backend image with --no-cache to pick up the newest release.
+yt-dlp[default]
+# JavaScript runtime that yt-dlp needs to read YouTube pages reliably.
+deno

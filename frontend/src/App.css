@@ -1,0 +1,518 @@
+/* ===================================================================
+   Design tokens
+
+   Two layers on purpose: a fixed palette, then semantic names that point
+   into it. Dark mode re-points only the semantic names, so a colour can
+   never be defined in one theme and missing in the other.
+   =================================================================== */
+
+:root {
+  /* --- palette: neutrals, very slightly cool --- */
+  --n-0:   #ffffff;
+  --n-25:  #fbfcfd;
+  --n-50:  #f5f7fa;
+  --n-100: #edf0f5;
+  --n-200: #e1e6ee;
+  --n-300: #cdd4e0;
+  --n-400: #9ba5b7;
+  --n-500: #6e7889;
+  --n-600: #515a6b;
+  --n-700: #3a4251;
+  --n-800: #252b37;
+  --n-900: #171c25;
+  --n-950: #0e1218;
+
+  /* --- palette: one accent, used sparingly --- */
+  --a-100: #e3ebff;
+  --a-200: #c6d6ff;
+  --a-400: #6b8dfa;
+  --a-500: #4a6cf0;
+  --a-600: #3a56d4;
+  --a-700: #2e44a8;
+
+  /* --- palette: meaning, kept apart from the accent --- */
+  --ok-100: #d9f3e4;  --ok-500: #18794e;  --ok-400: #3fbf80;
+  --wn-100: #fdeecd;  --wn-500: #8a5a00;  --wn-400: #e0a33a;
+  --er-100: #fde3e0;  --er-500: #b4291d;  --er-400: #f08073;
+
+  /* --- semantic: light --- */
+  --bg:          var(--n-50);
+  --surface:     var(--n-0);
+  --surface-2:   var(--n-50);
+  --surface-3:   var(--n-100);
+  --border:      var(--n-200);
+  --border-firm: var(--n-300);
+  --text:        var(--n-900);
+  --text-soft:   var(--n-600);
+  --text-faint:  var(--n-500);
+  --accent:      var(--a-600);
+  --accent-text: var(--n-0);
+  --accent-soft: var(--a-100);
+  --ok: var(--ok-500);   --ok-soft: var(--ok-100);
+  --warn: var(--wn-500); --warn-soft: var(--wn-100);
+  --bad: var(--er-500);  --bad-soft: var(--er-100);
+  --shadow-sm: 0 1px 2px rgb(16 24 40 / 6%), 0 1px 3px rgb(16 24 40 / 5%);
+  --shadow-md: 0 2px 4px rgb(16 24 40 / 5%), 0 8px 24px rgb(16 24 40 / 7%);
+  --ring: 0 0 0 3px var(--a-200);
+  color-scheme: light;
+
+  /* --- spacing, on a 4px rhythm --- */
+  --s1: 4px;  --s2: 8px;  --s3: 12px; --s4: 16px;
+  --s5: 20px; --s6: 24px; --s8: 32px; --s10: 40px; --s12: 48px;
+
+  --r-sm: 6px; --r-md: 10px; --r-lg: 14px; --r-full: 999px;
+
+  /* --- type --- */
+  --sans: "Inter Variable", "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mal: "Noto Sans Malayalam", var(--sans);
+  --mono: ui-monospace, "Cascadia Mono", "SF Mono", Consolas, monospace;
+
+  font-family: var(--sans);
+  font-synthesis-weight: none;
+  -webkit-font-smoothing: antialiased;
+  color: var(--text);
+  background: var(--bg);
+  line-height: 1.55;
+}
+
+/* Dark: only the semantic names move. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg:          var(--n-950);
+    --surface:     var(--n-900);
+    --surface-2:   var(--n-800);
+    --surface-3:   var(--n-700);
+    --border:      #2a3140;
+    --border-firm: #3a4453;
+    --text:        #e8ecf3;
+    --text-soft:   #a4aec0;
+    --text-faint:  #818c9f;
+    --accent:      var(--a-400);
+    --accent-text: var(--n-950);
+    --accent-soft: #1d2a4d;
+    --ok: var(--ok-400);   --ok-soft: #10301f;
+    --warn: var(--wn-400); --warn-soft: #332508;
+    --bad: var(--er-400);  --bad-soft: #3a1a16;
+    --shadow-sm: 0 1px 2px rgb(0 0 0 / 40%);
+    --shadow-md: 0 2px 6px rgb(0 0 0 / 35%), 0 12px 32px rgb(0 0 0 / 30%);
+    --ring: 0 0 0 3px #2b3e76;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg:          var(--n-950);
+  --surface:     var(--n-900);
+  --surface-2:   var(--n-800);
+  --surface-3:   var(--n-700);
+  --border:      #2a3140;
+  --border-firm: #3a4453;
+  --text:        #e8ecf3;
+  --text-soft:   #a4aec0;
+  --text-faint:  #818c9f;
+  --accent:      var(--a-400);
+  --accent-text: var(--n-950);
+  --accent-soft: #1d2a4d;
+  --ok: var(--ok-400);   --ok-soft: #10301f;
+  --warn: var(--wn-400); --warn-soft: #332508;
+  --bad: var(--er-400);  --bad-soft: #3a1a16;
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / 40%);
+  --shadow-md: 0 2px 6px rgb(0 0 0 / 35%), 0 12px 32px rgb(0 0 0 / 30%);
+  --ring: 0 0 0 3px #2b3e76;
+  color-scheme: dark;
+}
+
+/* ===================================================================
+   Base
+   =================================================================== */
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  padding-left: max(var(--s4), env(safe-area-inset-left, 0px));
+  padding-right: max(var(--s4), env(safe-area-inset-right, 0px));
+}
+
+.page {
+  max-width: 940px;
+  margin: 0 auto;
+  padding-block: var(--s8) var(--s12);
+  display: grid;
+  gap: var(--s5);
+}
+
+h1, h2, h3 { margin: 0; letter-spacing: -0.015em; text-wrap: balance; }
+h1 { font-size: 1.6rem; font-weight: 650; }
+h2 { font-size: 1.15rem; font-weight: 620; }
+h3 { font-size: 1rem; font-weight: 620; }
+p { margin: 0; }
+a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+
+.muted { color: var(--text-soft); }
+.small { font-size: 0.875rem; }
+small.muted { display: block; margin-top: var(--s2); font-weight: 400; color: var(--text-soft); }
+code, .mono { font-family: var(--mono); font-size: 0.875em; }
+
+:focus-visible { outline: none; box-shadow: var(--ring); border-radius: var(--r-sm); }
+
+/* ===================================================================
+   Surfaces
+   Depth is used by role: the form is raised, lists sit flat.
+   =================================================================== */
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  padding: var(--s6);
+  box-shadow: var(--shadow-sm);
+}
+
+header { display: grid; gap: var(--s2); }
+.header-row { display: flex; justify-content: space-between; align-items: center; gap: var(--s4); flex-wrap: wrap; }
+.subtitle { color: var(--text-soft); max-width: 62ch; }
+
+/* ===================================================================
+   Controls
+   =================================================================== */
+
+button, a.button {
+  font: inherit;
+  font-weight: 520;
+  padding: var(--s2) var(--s4);
+  border: 1px solid var(--border-firm);
+  border-radius: var(--r-sm);
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+  transition: background 120ms ease, border-color 120ms ease, color 120ms ease;
+}
+a.button { display: inline-block; text-decoration: none; }
+button:hover:not(:disabled), a.button:hover { background: var(--surface-2); border-color: var(--text-faint); }
+button:disabled { opacity: 0.55; cursor: default; }
+
+button.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-text);
+  font-weight: 580;
+  padding: var(--s3) var(--s6);
+}
+button.primary:hover:not(:disabled) { filter: brightness(1.08); background: var(--accent); border-color: var(--accent); }
+
+label { display: block; margin-bottom: var(--s4); font-weight: 560; }
+input[type="url"], input[type="text"] {
+  display: block;
+  width: 100%;
+  margin-top: var(--s2);
+  padding: var(--s3) var(--s4);
+  font: inherit;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border-firm);
+  border-radius: var(--r-sm);
+  transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+input[type="url"]::placeholder, input[type="text"]::placeholder { color: var(--text-faint); }
+input[type="url"]:focus, input[type="text"]:focus {
+  outline: none; border-color: var(--accent); box-shadow: var(--ring);
+}
+input[type="file"] { display: block; margin-top: var(--s2); font: inherit; color: var(--text-soft); }
+
+/* segmented controls: tabs and pills share one look */
+.tabs { display: flex; gap: var(--s1); border-bottom: 1px solid var(--border); margin-bottom: var(--s5); flex-wrap: wrap; }
+.tab {
+  border: none; background: none; border-radius: 0;
+  padding: var(--s3) var(--s4);
+  border-bottom: 2px solid transparent;
+  color: var(--text-soft); font-weight: 560;
+  margin-bottom: -1px;
+}
+.tab:hover:not(.active) { background: none; color: var(--text); border-color: transparent; }
+.tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+.choice { margin-bottom: var(--s5); }
+.choice-label { display: block; font-weight: 560; margin-bottom: var(--s2); }
+.pills {
+  display: inline-flex; flex-wrap: wrap;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  padding: 3px;
+  gap: 3px;
+}
+.pills button {
+  border: 1px solid transparent; background: none;
+  padding: var(--s2) var(--s4);
+  color: var(--text-soft); font-weight: 530;
+  border-radius: calc(var(--r-sm) - 2px);
+}
+.pills button:hover:not(.active):not(:disabled) { background: var(--surface); border-color: transparent; color: var(--text); }
+.pills button.active {
+  background: var(--surface); color: var(--accent);
+  border-color: var(--border); font-weight: 580;
+  box-shadow: var(--shadow-sm);
+}
+
+.theme-switch { display: flex; background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--r-sm); padding: 3px; gap: 3px; }
+.theme-switch button {
+  border: 1px solid transparent; background: none; border-radius: calc(var(--r-sm) - 2px);
+  padding: 5px var(--s3); font-size: 0.85rem; color: var(--text-soft); font-weight: 530;
+}
+.theme-switch button:hover:not(.active) { background: var(--surface); border-color: transparent; }
+.theme-switch button.active { background: var(--surface); color: var(--accent); border-color: var(--border); font-weight: 580; }
+
+.actions { display: flex; align-items: center; gap: var(--s4); flex-wrap: wrap; }
+.progress { display: flex; align-items: center; gap: var(--s2); color: var(--text-soft); font-size: 0.875rem; }
+
+/* ===================================================================
+   Credits strip — deliberately lighter than the form beside it
+   =================================================================== */
+
+.usage {
+  display: flex; flex-wrap: wrap; gap: var(--s4) var(--s8); align-items: center;
+  padding: var(--s4) var(--s5);
+  background: var(--surface-2);
+  box-shadow: none;
+}
+.usage-main { flex: 1 1 320px; min-width: 0; }
+.usage-title {
+  font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.09em;
+  color: var(--text-faint); margin: 0 0 var(--s1); font-weight: 620;
+}
+.usage-numbers { margin: 0 0 var(--s2); font-variant-numeric: tabular-nums; color: var(--text-soft); }
+.usage-numbers strong { font-size: 1.35rem; font-weight: 640; color: var(--text); }
+.meter { height: 6px; border-radius: var(--r-full); background: var(--surface-3); overflow: hidden; }
+.meter > div { height: 100%; background: var(--accent); border-radius: var(--r-full); transition: width 300ms ease; }
+.meter.low > div { background: var(--bad); }
+.usage-tool {
+  display: flex; flex-direction: column; gap: 2px;
+  padding-left: var(--s5); border-left: 1px solid var(--border);
+  font-variant-numeric: tabular-nums;
+}
+.usage-tool strong { font-size: 1.35rem; font-weight: 640; }
+.usage-tool .small { margin: 0; color: var(--text-soft); }
+
+/* ===================================================================
+   Job status
+   =================================================================== */
+
+/* A stepper, not a row of pills: the dots and the line between them say which
+   stages are behind and which are still to come. */
+.stages {
+  display: flex; flex-wrap: wrap; row-gap: var(--s2);
+  list-style: none; padding: 0; margin: var(--s5) 0;
+}
+.stages li {
+  display: flex; align-items: center; gap: var(--s2);
+  font-size: 0.85rem; font-weight: 520; color: var(--text-faint);
+  white-space: nowrap;
+}
+.stages li::before {
+  content: ""; flex: none; width: 9px; height: 9px; border-radius: 50%;
+  border: 2px solid var(--border-firm); background: var(--surface);
+}
+.stages li:not(:last-child)::after {
+  content: ""; width: 20px; height: 2px; background: var(--border);
+  margin: 0 var(--s3); border-radius: var(--r-full);
+}
+.stages li.complete { color: var(--text-soft); }
+.stages li.complete::before { background: var(--ok); border-color: var(--ok); }
+.stages li.complete::after { background: var(--ok); }
+.stages li.current { color: var(--accent); font-weight: 620; }
+.stages li.current::before {
+  background: var(--accent); border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.badges { display: flex; gap: var(--s2); flex-wrap: wrap; margin: var(--s3) 0 0; }
+/* Neutral by default. A badge states a fact; amber is reserved for work still
+   in progress and red for failure, so "Transcript only" is not dressed up as a
+   warning. */
+.badge {
+  padding: 2px var(--s3); border-radius: var(--r-full); font-size: 0.8rem; font-weight: 550;
+  background: var(--surface-3); color: var(--text-soft); white-space: nowrap;
+}
+.badge.done, .badge.training { background: var(--ok-soft); color: var(--ok); }
+.badge.failed { background: var(--bad-soft); color: var(--bad); }
+.badge.engine { background: var(--accent-soft); color: var(--accent); }
+/* The job statuses that mean "still working" — see stagesFor() in App.jsx. */
+.badge.queued, .badge.downloading, .badge.transcribing,
+.badge.transcribing_local, .badge.segmenting {
+  background: var(--warn-soft); color: var(--warn);
+}
+
+.promote { margin-top: var(--s4); display: flex; flex-direction: column; gap: var(--s2); align-items: flex-start; }
+.job-progress { margin-top: var(--s4); }
+.job-progress .small { margin-top: var(--s2); }
+.job-links { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s3) var(--s4); margin: var(--s3) 0 0; }
+.source-link { overflow-wrap: anywhere; }
+
+.times { width: auto; margin-top: var(--s4); font-size: 0.9rem; border-collapse: collapse; }
+.times th { text-align: left; font-weight: 560; color: var(--text); padding: var(--s1) var(--s5) var(--s1) 0; border: none; }
+.times td { padding: var(--s1) var(--s5) var(--s1) 0; white-space: nowrap; border: none; }
+
+/* ===================================================================
+   Transcripts — the part people actually read
+   =================================================================== */
+
+.transcript { margin-top: var(--s5); border-top: 1px solid var(--border); padding-top: var(--s5); }
+.transcript-head { display: flex; justify-content: space-between; align-items: center; gap: var(--s3); margin-bottom: var(--s3); flex-wrap: wrap; }
+.second-transcript { margin-top: var(--s6); }
+.transcript-text {
+  white-space: pre-wrap;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  padding: var(--s5);
+  max-height: 420px;
+  overflow-y: auto;
+  /* Malayalam is dense and needs more room between lines than Latin text. */
+  font-family: var(--mal);
+  font-size: 1.02rem;
+  line-height: 1.9;
+  max-width: 68ch;
+}
+
+details { margin-top: var(--s4); }
+summary { cursor: pointer; font-weight: 560; padding: var(--s1) 0; color: var(--text-soft); }
+summary:hover { color: var(--text); }
+
+/* ===================================================================
+   Tables
+   =================================================================== */
+
+table { width: 100%; border-collapse: collapse; margin-top: var(--s2); font-size: 0.9rem; }
+th, td { text-align: left; padding: var(--s3); border-bottom: 1px solid var(--border); vertical-align: top; }
+th {
+  color: var(--text-faint); font-weight: 580; font-size: 0.75rem;
+  text-transform: uppercase; letter-spacing: 0.05em;
+}
+tbody tr:last-child td { border-bottom: none; }
+td.num { color: var(--text-faint); width: 3em; font-variant-numeric: tabular-nums; }
+td.time { white-space: nowrap; font-variant-numeric: tabular-nums; color: var(--text-soft); }
+.ml, td.ml { font-family: var(--mal); line-height: 1.8; }
+
+.scroll { overflow-x: auto; }
+
+/* ===================================================================
+   Job cards
+   =================================================================== */
+
+.job-cards { list-style: none; margin: var(--s4) 0 0; padding: 0; display: grid; gap: var(--s2); }
+.job-cards li { display: grid; justify-items: start; }
+
+.job-card {
+  display: block; width: 100%; text-align: left;
+  padding: var(--s3) var(--s4);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  cursor: pointer;
+}
+.job-card:hover { background: var(--surface-2); border-color: var(--border-firm); }
+.job-card.selected {
+  border-color: var(--accent); background: var(--accent-soft);
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+.job-card-top {
+  display: flex; align-items: baseline; justify-content: space-between;
+  gap: var(--s3); margin-bottom: var(--s1);
+}
+.job-card-title { font-weight: 560; overflow-wrap: anywhere; }
+.job-card-meta { display: block; font-size: 0.85rem; color: var(--text-soft); }
+
+/* Sits under the card, not inside it: a link inside a button is invalid HTML.
+   In flow rather than positioned over the card, so it can never land on top of
+   the meta line on a narrow screen. */
+.job-card-link { margin: var(--s1) 0 0 var(--s4); font-size: 0.85rem; }
+
+/* ===================================================================
+   English spelling table
+   =================================================================== */
+
+.coverage { margin: var(--s4) 0 var(--s5); }
+.coverage .meter { margin-bottom: var(--s2); }
+.coverage p { max-width: 72ch; }
+
+.spelling-filter { margin-bottom: var(--s4); }
+
+.spellings { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--s2); }
+.spelling {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr) auto;
+  align-items: center;
+  gap: var(--s3) var(--s4);
+  padding: var(--s3) var(--s4);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--surface);
+}
+.spelling.approved { background: var(--surface-2); border-color: var(--border); }
+.spelling-word { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.spelling-word strong { overflow-wrap: anywhere; font-weight: 560; }
+.spelling input { margin-top: 0; font-size: 1.05rem; }
+.spelling-actions { display: flex; gap: var(--s2); white-space: nowrap; }
+
+/* Full-width rows under the three columns. */
+.spelling-alts, .spelling-error { grid-column: 1 / -1; margin: 0; }
+.spelling-alts { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s2); }
+button.alt {
+  padding: 1px var(--s2);
+  border-radius: var(--r-sm);
+  background: var(--surface-2);
+  border-color: var(--border);
+  font-size: 0.85rem;
+  color: var(--text-soft);
+}
+button.alt:hover { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+
+.show-more { margin-top: var(--s4); }
+
+.empty {
+  margin: var(--s4) 0 0;
+  padding: var(--s6) var(--s5);
+  border: 1px dashed var(--border-firm);
+  border-radius: var(--r-md);
+  color: var(--text-soft);
+  text-align: center;
+  max-width: 54ch; margin-inline: auto;
+}
+
+/* ===================================================================
+   Comparison and messages
+   =================================================================== */
+
+.comparison { margin-top: var(--s5); border-top: 1px solid var(--border); padding-top: var(--s4); }
+table.compare td { font-size: 0.9rem; }
+
+.error {
+  color: var(--bad); background: var(--bad-soft);
+  padding: var(--s3) var(--s4); border-radius: var(--r-sm);
+  overflow-wrap: anywhere; font-size: 0.9rem;
+}
+.warn-box {
+  background: var(--warn-soft); color: var(--warn);
+  padding: var(--s3) var(--s4); border-radius: var(--r-sm);
+  font-size: 0.9rem; margin: 0 0 var(--s3); line-height: 1.6;
+}
+.warn-box code { background: transparent; }
+
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; animation: none !important; }
+}
+
+@media (max-width: 640px) {
+  .page { padding-block: var(--s5) var(--s10); gap: var(--s4); }
+  .card { padding: var(--s4); border-radius: var(--r-md); }
+  .usage-tool { padding-left: 0; border-left: none; }
+  .transcript-text { padding: var(--s4); font-size: 1rem; }
+  /* The status badge would otherwise squeeze a long lecture title to nothing. */
+  .job-card-top { display: grid; justify-items: start; gap: var(--s1); }
+  /* Word, spelling box and buttons stack instead of sharing one narrow row. */
+  .spelling { grid-template-columns: minmax(0, 1fr); }
+  .spelling-actions { justify-content: flex-start; }
+}

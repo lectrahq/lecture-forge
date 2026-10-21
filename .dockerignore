@@ -1,0 +1,24 @@
+# What must NOT be sent to the Docker daemon when building from the project root
+# (gpu/Dockerfile uses the root as its build context).
+#
+# Without this, every GPU build shipped the .env files and the whole data folder
+# to the daemon. Nothing copied them into the image, but they have no business
+# being in the build context, and data/ makes the build needlessly slow.
+
+# Secrets
+*.env
+!*.env.example
+
+# Job output: audio, transcripts, clips, the database (gigabytes)
+data/
+
+# Caches and build output
+__pycache__/
+*.pyc
+node_modules/
+frontend/dist/
+
+# Local tooling
+.vscode/
+.git/
+.gitignore

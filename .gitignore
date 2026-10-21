@@ -1,0 +1,23 @@
+# Job outputs (audio, transcripts, segments, SQLite DB)
+data/
+
+# Secrets - there is one .env, in the project root
+.env
+*.env
+!.env.example
+
+# Python
+__pycache__/
+*.pyc
+
+# Node / build output
+node_modules/
+frontend/dist/
+
+# Screenshots the browser checks take on every run - regenerated, not source
+tests/screenshots/
+
+# Windows / editor clutter
+Thumbs.db
+desktop.ini
+*.swp

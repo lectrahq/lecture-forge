@@ -962,6 +962,7 @@ def get_transcript(job_id: str):
             "source": "local",
             "text": text,
             "local_text": None,
+            "words": [],
             "segments": segments,
             "human_verified": is_corrected,
             "original_segments": None,
@@ -992,8 +993,17 @@ def get_transcript(job_id: str):
         except Exception:
             pass
 
+    timed_words = []
     with open(os.path.join(folder, "transcript.json"), encoding="utf-8") as f:
-        language = json.load(f).get("language_code")
+        raw_tr = json.load(f)
+        language = raw_tr.get("language_code")
+        for w in raw_tr.get("words", []):
+            if w.get("type") == "word" and w.get("text") and w.get("start") is not None and w.get("end") is not None:
+                timed_words.append({
+                    "text": w["text"].strip(),
+                    "start": round(float(w["start"]), 2),
+                    "end": round(float(w["end"]), 2),
+                })
 
     local_text = None
     local_path = os.path.join(folder, "local_transcript.txt")
@@ -1008,6 +1018,7 @@ def get_transcript(job_id: str):
         "source": "elevenlabs",
         "text": text,
         "local_text": local_text,
+        "words": timed_words,
         "human_verified": is_corrected,
         "segments": [
             # 'file' is only present on training jobs, where the clips were kept.

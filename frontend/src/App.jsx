@@ -467,6 +467,18 @@ export default function App() {
   const [usage, setUsage] = useState(null);
   const jobRef = useRef(null);
   const [comparison, setComparison] = useState(null);
+  const [audioCurrentTime, setAudioCurrentTime] = useState(0);
+  const [audioIsPlaying, setAudioIsPlaying] = useState(false);
+  const [audioSeekRequest, setAudioSeekRequest] = useState(null);
+  const [audioTogglePlayTrigger, setAudioTogglePlayTrigger] = useState(0);
+
+  const handleAudioSeek = useCallback((time) => {
+    setAudioSeekRequest({ time, ts: Date.now() });
+  }, []);
+
+  const handleAudioTogglePlay = useCallback(() => {
+    setAudioTogglePlayTrigger(Date.now());
+  }, []);
 
   const refreshJobs = useCallback(() => {
     listJobs().then(setJobs).catch(() => {});
@@ -513,6 +525,10 @@ export default function App() {
     setJob(null);
     setTranscript(null);
     setComparison(null);
+    setAudioCurrentTime(0);
+    setAudioIsPlaying(false);
+    setAudioSeekRequest(null);
+    setAudioTogglePlayTrigger(0);
     poll();
     return () => {
       stopped = true;
@@ -606,6 +622,12 @@ export default function App() {
                     setJob(updated);
                     refreshJobs();
                   }}
+                  audioCurrentTime={audioCurrentTime}
+                  onAudioTimeUpdate={setAudioCurrentTime}
+                  audioIsPlaying={audioIsPlaying}
+                  onAudioPlayStateChange={setAudioIsPlaying}
+                  audioSeekRequest={audioSeekRequest}
+                  audioTogglePlayTrigger={audioTogglePlayTrigger}
                 />
                 {job.audio_available && job.status === "done" && (
                   <AudioHealthCard
@@ -625,6 +647,10 @@ export default function App() {
                 transcript={transcript}
                 comparison={comparison}
                 job={job}
+                currentTime={audioCurrentTime}
+                isPlaying={audioIsPlaying}
+                onSeek={handleAudioSeek}
+                onTogglePlay={handleAudioTogglePlay}
                 onUpdated={() => {
                   if (currentId) {
                     getTranscript(currentId).then(setTranscript).catch(() => {});
@@ -1052,7 +1078,15 @@ function SubmitForm({ onCreated }) {
 }
 
 // --- Full In-Browser Lecture Audio Player ---
-function FullAudioPlayer({ job }) {
+function FullAudioPlayer({
+  job,
+  currentTime: externalCurrentTime,
+  onTimeUpdate,
+  isPlaying: externalIsPlaying,
+  onPlayStateChange,
+  seekRequest,
+  togglePlayTrigger,
+}) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(job.duration || 0);
@@ -1071,41 +1105,72 @@ function FullAudioPlayer({ job }) {
     }
   }, [job.duration, duration]);
 
+  // Handle external seek requests (e.g. clicking a word in the transcript)
+  useEffect(() => {
+    if (!seekRequest) return;
+    const audio = audioRef.current;
+    if (!audio) return;
+    const target = Math.max(0, Math.min(duration || 99999, seekRequest.time));
+    audio.currentTime = target;
+    setCurrentTime(target);
+    if (onTimeUpdate) onTimeUpdate(target);
+    audio.play().then(() => {
+      setIsPlaying(true);
+      if (onPlayStateChange) onPlayStateChange(true);
+    }).catch(() => {});
+  }, [seekRequest]);
+
+  // Handle play/pause toggles from transcript header
+  useEffect(() => {
+    if (!togglePlayTrigger) return;
+    togglePlay();
+  }, [togglePlayTrigger]);
+
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
 
-    const onTimeUpdate = () => {
+    const handleAudioTimeUpdate = () => {
       if (!isSeeking) {
-        setCurrentTime(audio.currentTime);
+        const t = audio.currentTime;
+        setCurrentTime(t);
+        if (onTimeUpdate) onTimeUpdate(t);
       }
     };
-    const onLoadedMetadata = () => {
+    const handleLoadedMetadata = () => {
       if (audio.duration && !isNaN(audio.duration) && audio.duration !== Infinity) {
         setDuration(audio.duration);
       }
     };
-    const onEnded = () => {
+    const handleEnded = () => {
       setIsPlaying(false);
       setCurrentTime(0);
+      if (onPlayStateChange) onPlayStateChange(false);
+      if (onTimeUpdate) onTimeUpdate(0);
     };
-    const onPlay = () => setIsPlaying(true);
-    const onPause = () => setIsPlaying(false);
+    const handlePlay = () => {
+      setIsPlaying(true);
+      if (onPlayStateChange) onPlayStateChange(true);
+    };
+    const handlePause = () => {
+      setIsPlaying(false);
+      if (onPlayStateChange) onPlayStateChange(false);
+    };
 
-    audio.addEventListener("timeupdate", onTimeUpdate);
-    audio.addEventListener("loadedmetadata", onLoadedMetadata);
-    audio.addEventListener("ended", onEnded);
-    audio.addEventListener("play", onPlay);
-    audio.addEventListener("pause", onPause);
+    audio.addEventListener("timeupdate", handleAudioTimeUpdate);
+    audio.addEventListener("loadedmetadata", handleLoadedMetadata);
+    audio.addEventListener("ended", handleEnded);
+    audio.addEventListener("play", handlePlay);
+    audio.addEventListener("pause", handlePause);
 
     return () => {
-      audio.removeEventListener("timeupdate", onTimeUpdate);
-      audio.removeEventListener("loadedmetadata", onLoadedMetadata);
-      audio.removeEventListener("ended", onEnded);
-      audio.removeEventListener("play", onPlay);
-      audio.removeEventListener("pause", onPause);
+      audio.removeEventListener("timeupdate", handleAudioTimeUpdate);
+      audio.removeEventListener("loadedmetadata", handleLoadedMetadata);
+      audio.removeEventListener("ended", handleEnded);
+      audio.removeEventListener("play", handlePlay);
+      audio.removeEventListener("pause", handlePause);
     };
-  }, [isSeeking]);
+  }, [isSeeking, onTimeUpdate, onPlayStateChange]);
 
   function togglePlay() {
     const audio = audioRef.current;
@@ -1123,6 +1188,7 @@ function FullAudioPlayer({ job }) {
     const target = Math.max(0, Math.min(duration || 99999, audio.currentTime + seconds));
     audio.currentTime = target;
     setCurrentTime(target);
+    if (onTimeUpdate) onTimeUpdate(target);
   }
 
   function handleSeekStart(e) {
@@ -1141,6 +1207,7 @@ function FullAudioPlayer({ job }) {
     if (audioRef.current) {
       audioRef.current.currentTime = target;
     }
+    if (onTimeUpdate) onTimeUpdate(target);
   }
 
   function changeSpeed(speed) {
@@ -1291,7 +1358,16 @@ function FullAudioPlayer({ job }) {
 }
 
 // --- Active Job Status & Inspector ---
-function JobStatus({ job, onPromoted }) {
+function JobStatus({
+  job,
+  onPromoted,
+  audioCurrentTime,
+  onAudioTimeUpdate,
+  audioIsPlaying,
+  onAudioPlayStateChange,
+  audioSeekRequest,
+  audioTogglePlayTrigger,
+}) {
   const stages = stagesFor(job);
   const currentStage = stages.indexOf(job.status);
   const [promoting, setPromoting] = useState(false);
@@ -1370,7 +1446,15 @@ function JobStatus({ job, onPromoted }) {
       )}
 
       {job.audio_available && (
-        <FullAudioPlayer job={job} />
+        <FullAudioPlayer
+          job={job}
+          currentTime={audioCurrentTime}
+          onTimeUpdate={onAudioTimeUpdate}
+          isPlaying={audioIsPlaying}
+          onPlayStateChange={onAudioPlayStateChange}
+          seekRequest={audioSeekRequest}
+          togglePlayTrigger={audioTogglePlayTrigger}
+        />
       )}
 
       {job.source_url && (
@@ -2011,10 +2095,67 @@ function SegmentEditorAndPlayer({ job, transcript, onUpdated }) {
   );
 }
 
-// --- Transcript View & Comparison ---
-function TranscriptPane({ title, note, text, className = "" }) {
+// --- Interactive Word Timestamps & Transcript View ---
+function findActiveWordIndex(words, time) {
+  if (!words || words.length === 0 || time === undefined || time === null) return -1;
+  let low = 0;
+  let high = words.length - 1;
+
+  while (low <= high) {
+    const mid = (low + high) >> 1;
+    const w = words[mid];
+    if (time >= w.start && time <= w.end) {
+      return mid;
+    } else if (time < w.start) {
+      high = mid - 1;
+    } else {
+      low = mid + 1;
+    }
+  }
+
+  // Grace window (0.15s) after word finishes to bridge tiny inter-word gaps smoothly
+  if (high >= 0 && high < words.length) {
+    const lastWord = words[high];
+    if (time >= lastWord.start && time <= lastWord.end + 0.15) {
+      return high;
+    }
+  }
+
+  return -1;
+}
+
+function TranscriptPane({
+  title,
+  note,
+  text,
+  words = [],
+  currentTime = 0,
+  isPlaying = false,
+  onSeek,
+  onTogglePlay,
+  hasAudio = false,
+  className = "",
+}) {
   const [copied, setCopied] = useState(false);
   const [copyError, setCopyError] = useState("");
+  const [autoScroll, setAutoScroll] = useState(true);
+  const activeWordRef = useRef(null);
+
+  const activeIndex = useMemo(() => {
+    return findActiveWordIndex(words, currentTime);
+  }, [words, currentTime]);
+
+  useEffect(() => {
+    if (!autoScroll || activeIndex < 0) return;
+    const el = activeWordRef.current;
+    if (el) {
+      el.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+        inline: "nearest",
+      });
+    }
+  }, [activeIndex, autoScroll]);
 
   function copy() {
     setCopyError("");
@@ -2028,6 +2169,7 @@ function TranscriptPane({ title, note, text, className = "" }) {
   }
 
   const wordCount = useMemo(() => (text ? text.trim().split(/\s+/).length : 0), [text]);
+  const hasInteractiveWords = words && words.length > 0;
 
   return (
     <div className={className}>
@@ -2037,29 +2179,89 @@ function TranscriptPane({ title, note, text, className = "" }) {
             {title}
             {note && <span className="muted"> ({note})</span>}
           </h3>
-          {text && <span className="muted small">{wordCount.toLocaleString()} words · {text.length.toLocaleString()} characters</span>}
-        </div>
-        <button type="button" onClick={copy} disabled={!text}>
-          {copied ? (
-            <>
-              <IconCheck /> Copied
-            </>
-          ) : (
-            <>
-              <IconCopy /> Copy text
-            </>
+          {text && (
+            <span className="muted small">
+              {wordCount.toLocaleString()} words · {text.length.toLocaleString()} characters
+              {hasInteractiveWords && " · Click any word to jump audio"}
+            </span>
           )}
-        </button>
+        </div>
+        <div className="transcript-toolbar">
+          {hasInteractiveWords && hasAudio && onTogglePlay && (
+            <button
+              type="button"
+              className={`transcript-mini-play-btn ${isPlaying ? "playing" : ""}`}
+              onClick={onTogglePlay}
+              title={isPlaying ? "Pause audio" : "Play audio from current position"}
+            >
+              {isPlaying ? <IconPause /> : <IconPlay />}
+              <span>{isPlaying ? "Pause" : "Play"}</span>
+              {currentTime > 0 && <span className="transcript-mini-time">{formatTime(currentTime)}</span>}
+            </button>
+          )}
+
+          {hasInteractiveWords && (
+            <button
+              type="button"
+              className={`autoscroll-toggle-btn ${autoScroll ? "active" : ""}`}
+              onClick={() => setAutoScroll((prev) => !prev)}
+              title={autoScroll ? "Auto-scroll is following speech. Click to freeze view." : "Auto-scroll is paused. Click to follow speech."}
+            >
+              <span className={`autoscroll-dot ${autoScroll ? "on" : ""}`} />
+              <span>Auto-scroll</span>
+            </button>
+          )}
+
+          <button type="button" onClick={copy} disabled={!text}>
+            {copied ? (
+              <>
+                <IconCheck /> Copied
+              </>
+            ) : (
+              <>
+                <IconCopy /> Copy text
+              </>
+            )}
+          </button>
+        </div>
       </div>
-      <div className="transcript-text">
-        {text || <em className="muted">(no speech detected in this audio recording)</em>}
+      <div className="transcript-text" tabIndex={0}>
+        {hasInteractiveWords ? (
+          words.map((w, idx) => {
+            const isActive = idx === activeIndex;
+            const isPassed = activeIndex >= 0 && idx < activeIndex;
+            return (
+              <span key={idx}>
+                <span
+                  ref={isActive ? activeWordRef : null}
+                  className={`k-word ${isActive ? "active" : ""} ${isPassed ? "passed" : ""}`}
+                  onClick={() => onSeek && onSeek(w.start)}
+                  title={`Jump audio to ${formatTime(w.start)} (${w.text})`}
+                >
+                  {w.text}
+                </span>{" "}
+              </span>
+            );
+          })
+        ) : (
+          text || <em className="muted">(no speech detected in this audio recording)</em>
+        )}
       </div>
       {copyError && <p className="error" style={{ marginTop: 8 }}>{copyError}</p>}
     </div>
   );
 }
 
-function TranscriptView({ transcript, comparison, job, onUpdated }) {
+function TranscriptView({
+  transcript,
+  comparison,
+  job,
+  onUpdated,
+  currentTime = 0,
+  isPlaying = false,
+  onSeek,
+  onTogglePlay,
+}) {
   const isLocal = transcript.source === "local";
 
   return (
@@ -2068,6 +2270,12 @@ function TranscriptView({ transcript, comparison, job, onUpdated }) {
         title={isLocal ? "Transcript (local model)" : "Transcript (ElevenLabs)"}
         note={transcript.language_code}
         text={transcript.text}
+        words={transcript.words || []}
+        currentTime={currentTime}
+        isPlaying={isPlaying}
+        onSeek={onSeek}
+        onTogglePlay={onTogglePlay}
+        hasAudio={Boolean(job?.audio_available)}
       />
 
       {transcript.local_text && (
@@ -2075,6 +2283,10 @@ function TranscriptView({ transcript, comparison, job, onUpdated }) {
           className="second-transcript"
           title="Transcript (local model)"
           text={transcript.local_text}
+          words={[]}
+          currentTime={currentTime}
+          isPlaying={isPlaying}
+          hasAudio={false}
         />
       )}
 

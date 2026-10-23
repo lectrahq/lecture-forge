@@ -1265,6 +1265,115 @@ input[type="url"]:focus, input[type="text"]:focus {
   }
 }
 
+/* --- Interactive Word Karaoke Highlighting --- */
+.k-word {
+  display: inline-block;
+  cursor: pointer;
+  border-radius: 4px;
+  padding: 1px 4px;
+  margin: 0 1px;
+  color: var(--text);
+  transition: background 0.12s ease, color 0.12s ease, transform 0.12s ease, box-shadow 0.12s ease;
+  user-select: text;
+}
+
+.k-word:hover {
+  background: var(--surface-hover);
+  color: var(--primary);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.k-word.passed {
+  color: var(--text);
+  opacity: 0.88;
+}
+
+.k-word.active {
+  background: #f59e0b;
+  color: #0f172a !important;
+  font-weight: 700;
+  border-radius: 4px;
+  box-shadow: 0 0 12px rgba(245, 158, 11, 0.6), 0 2px 4px rgba(0, 0, 0, 0.15);
+  transform: scale(1.06);
+  position: relative;
+  z-index: 2;
+  text-decoration: none;
+}
+
+/* Transcript Toolbar & Mini Controls */
+.transcript-mini-play-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  border-radius: var(--r-sm);
+  background: var(--surface-hover);
+  border: 1px solid var(--border);
+  color: var(--text);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.transcript-mini-play-btn:hover {
+  background: var(--surface-2);
+  border-color: var(--border-hover);
+}
+
+.transcript-mini-play-btn.playing {
+  background: rgba(16, 185, 129, 0.14);
+  border-color: rgba(16, 185, 129, 0.4);
+  color: #10b981;
+}
+
+.transcript-mini-time {
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  opacity: 0.85;
+  margin-left: 2px;
+}
+
+.autoscroll-toggle-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  font-size: 0.82rem;
+  font-weight: 500;
+  border-radius: var(--r-sm);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.autoscroll-toggle-btn:hover {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+
+.autoscroll-toggle-btn.active {
+  background: var(--surface-hover);
+  border-color: var(--primary);
+  color: var(--text);
+}
+
+.autoscroll-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  transition: background 0.2s ease, box-shadow 0.2s ease;
+}
+
+.autoscroll-dot.on {
+  background: #10b981;
+  box-shadow: 0 0 6px rgba(16, 185, 129, 0.7);
+}
+
 details {
   margin-top: var(--s5);
   background: var(--surface-2);

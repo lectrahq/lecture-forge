@@ -5,6 +5,33 @@ deployed; MINOR = small fix, wording or documentation change.
 
 ---
 
+## 2026-10-23 — Synchronized word-by-word audio karaoke highlighting and click-to-seek scrubbing [MAJOR]
+
+**What changed:** Reviewers and researchers listening to long lecture recordings previously had to manually read ahead in the static transcript text without visual synchronization to the spoken audio. Finding the exact point in the audio where a specific word was uttered required guesswork and trial-and-error timeline scrubbing.
+
+A real-time, interactive **word-by-word karaoke audio synchronization engine** has now been implemented:
+1. **Word-Level Timing Extraction Backend:**
+   - Updated `get_transcript(job_id)` in `backend/main.py` to extract high-precision word timestamps (`start`, `end`, `text`) directly from the ElevenLabs ASR output (`transcript.json`).
+   - Timestamps are rounded to 10ms precision and served via `GET /api/jobs/{job_id}/transcript` under the new `words` array.
+2. **Dynamic Karaoke Highlighting:**
+   - In `<TranscriptPane />`, words are rendered as interactive `.k-word` elements.
+   - High-performance binary search ($O(\log N)$) matches `currentTime` from the full lecture audio player against word timing bounds, avoiding full-DOM re-renders on every `timeupdate` tick.
+   - The active word illuminates in warm glowing amber (`#f59e0b` with `#0f172a` text, WCAG AAA compliant) with a smooth pulse halo, while past words subtly dim for easy reading progress tracking.
+3. **Interactive Click-to-Seek:**
+   - Reviewers can click on **any word** in the transcript text to instantly jump audio playback to that exact word's start time and begin playing immediately.
+4. **Smooth Auto-Scroll & Viewport Tracking:**
+   - Added an integrated `Auto-scroll` toggle in the transcript toolbar with a live green indicator dot. When active, it smoothly centers the spoken word in the viewport.
+   - A mini Play/Pause control and live timestamp counter in the transcript header allow control without scrolling back up to the top player.
+
+**Files touched:**
+- `backend/main.py` — parsed word timing data from `transcript.json` and populated the `words` field in the transcript response.
+- `frontend/src/App.jsx` — added binary search word tracking, synchronized playback state between `<FullAudioPlayer />` and `<TranscriptView />`, interactive word spans with click-to-seek, auto-scroll centering, and mini transcript audio controls.
+- `frontend/src/App.css` — added styling for `.k-word`, `.k-word:hover`, `.k-word.active`, `.k-word.passed`, `.transcript-mini-play-btn`, and `.autoscroll-toggle-btn`.
+
+**How to check it:** Open any ElevenLabs-transcribed lecture on `https://forge.rejected.cc` (e.g. `20261021-034533-6df118`). Click Play on the audio player or click the mini "Play" button in the transcript header. Observe words illuminate in glowing golden amber in real-time as the instructor speaks. Click any word further down in the transcript: audio instantly jumps to that word. Toggle "Auto-scroll" off or on to freeze or follow along.
+
+---
+
 ## 2026-10-23 — Full in-browser lecture audio player with seeking and library previews [MAJOR]
 
 **What changed:** Previously, listening to a lecture's complete recording required downloading the entire multi-megabyte WAV file to the local computer. Reviewers could only audition short 5–15 second cut training clips inside the segment editor.

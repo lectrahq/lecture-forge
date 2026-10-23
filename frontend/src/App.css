@@ -2681,11 +2681,119 @@ button.alt:hover {
   transform: none;
 }
 
-.nav-link-btn.active-pill {
+.nav-link-btn.active-pill,
+.nav-link-btn.active-tab {
+  background: var(--surface-2);
+  color: var(--text);
+  border-color: var(--border-strong, var(--border));
+  font-weight: 600;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+}
+
+.nav-link-btn.active-workspace-pill {
   background: var(--accent-soft);
   color: var(--accent);
   border-color: var(--accent);
   font-weight: 600;
+  box-shadow: 0 0 12px rgba(99, 102, 241, 0.25);
+}
+
+.nav-badge {
+  font-size: 0.72rem;
+  padding: 1px 6px;
+  border-radius: var(--r-full);
+  background: var(--surface-3, rgba(255, 255, 255, 0.08));
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  font-weight: 600;
+}
+
+/* Tabbed Views Animation and Layout */
+.view-pane {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s5);
+  animation: viewFadeIn 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes viewFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.view-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--s4);
+  flex-wrap: wrap;
+  padding-bottom: var(--s2);
+}
+
+.view-header-title {
+  max-width: 760px;
+}
+
+.view-header-title h1 {
+  font-size: 1.85rem;
+  letter-spacing: -0.025em;
+  margin-bottom: 6px;
+  color: var(--text);
+}
+
+.view-header-title .subtitle {
+  font-size: 0.95rem;
+  color: var(--text-soft);
+  line-height: 1.5;
+  margin: 0;
+}
+
+.active-workspace-card {
+  border-top: 3px solid var(--accent);
+}
+
+.empty-workspace-card {
+  padding: var(--s8) var(--s6);
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s3);
+  max-width: 600px;
+  margin: var(--s6) auto;
+}
+
+.empty-workspace-icon {
+  width: 58px;
+  height: 58px;
+  border-radius: 50%;
+  background: var(--surface-2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--accent);
+  margin-bottom: var(--s2);
+  border: 1px solid var(--border);
+}
+
+.empty-workspace-icon svg {
+  width: 28px;
+  height: 28px;
+}
+
+.empty-workspace-actions {
+  display: flex;
+  gap: var(--s3);
+  margin-top: var(--s3);
+  flex-wrap: wrap;
+  justify-content: center;
 }
 
 .nav-right {

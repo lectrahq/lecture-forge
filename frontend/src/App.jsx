@@ -377,12 +377,12 @@ function IconForward10() {
 }
 
 // --- Navigation Components ---
-function StickyNavbar({ jobsCount, currentId, usage, onNavigate }) {
+function StickyNavbar({ activeTab, onSelectTab, jobsCount, currentId, usage }) {
   const creditsLeft = usage?.elevenlabs?.credits_left;
   return (
     <nav className="site-navbar">
       <div className="site-navbar-inner">
-        <a href="#top" className="nav-brand" onClick={(e) => { e.preventDefault(); onNavigate("top"); }}>
+        <a href="#library" className="nav-brand" onClick={(e) => { e.preventDefault(); onSelectTab("library"); }}>
           <div className="nav-brand-icon">
             <IconWaveform />
           </div>
@@ -393,23 +393,43 @@ function StickyNavbar({ jobsCount, currentId, usage, onNavigate }) {
         </a>
 
         <div className="nav-links">
-          <button type="button" className="nav-link-btn" onClick={() => onNavigate("ingest")}>
+          <button
+            type="button"
+            className={`nav-link-btn ${activeTab === "library" ? "active-tab" : ""}`}
+            onClick={() => onSelectTab("library")}
+          >
+            <IconList /> Library <span className="nav-badge">{jobsCount}</span>
+          </button>
+          <button
+            type="button"
+            className={`nav-link-btn ${activeTab === "transcribe" ? "active-tab" : ""}`}
+            onClick={() => onSelectTab("transcribe")}
+          >
             <IconPlus /> Transcribe
           </button>
-          <button type="button" className="nav-link-btn" onClick={() => onNavigate("library")}>
-            <IconList /> Library ({jobsCount})
-          </button>
-          <button type="button" className="nav-link-btn" onClick={() => onNavigate("datasets")}>
-            <IconLayers /> Datasets
-          </button>
-          <button type="button" className="nav-link-btn" onClick={() => onNavigate("spelling")}>
-            <IconBookOpen /> Spellings
-          </button>
           {currentId && (
-            <button type="button" className="nav-link-btn active-pill" onClick={() => onNavigate("active-job")}>
-              <span className="pulse-dot" /> Active Job
+            <button
+              type="button"
+              className={`nav-link-btn active-workspace-pill ${activeTab === "workspace" ? "active-tab" : ""}`}
+              onClick={() => onSelectTab("workspace")}
+            >
+              <span className="pulse-dot" /> Active Lecture
             </button>
           )}
+          <button
+            type="button"
+            className={`nav-link-btn ${activeTab === "datasets" ? "active-tab" : ""}`}
+            onClick={() => onSelectTab("datasets")}
+          >
+            <IconLayers /> Datasets
+          </button>
+          <button
+            type="button"
+            className={`nav-link-btn ${activeTab === "dictionary" ? "active-tab" : ""}`}
+            onClick={() => onSelectTab("dictionary")}
+          >
+            <IconBookOpen /> Dictionary
+          </button>
         </div>
 
         <div className="nav-right">
@@ -426,31 +446,51 @@ function StickyNavbar({ jobsCount, currentId, usage, onNavigate }) {
   );
 }
 
-function MobileBottomDock({ jobsCount, currentId, onNavigate }) {
+function MobileBottomDock({ activeTab, onSelectTab, jobsCount, currentId }) {
   return (
     <div className="mobile-bottom-dock" role="navigation" aria-label="Mobile Navigation">
       <div className="mobile-dock-inner">
-        <button type="button" className="mobile-dock-btn" onClick={() => onNavigate("ingest")}>
+        <button
+          type="button"
+          className={`mobile-dock-btn ${activeTab === "library" ? "active" : ""}`}
+          onClick={() => onSelectTab("library")}
+        >
+          <IconList />
+          <span>Library</span>
+        </button>
+        <button
+          type="button"
+          className={`mobile-dock-btn ${activeTab === "transcribe" ? "active" : ""}`}
+          onClick={() => onSelectTab("transcribe")}
+        >
           <IconPlus />
           <span>New</span>
         </button>
-        <button type="button" className="mobile-dock-btn" onClick={() => onNavigate("library")}>
-          <IconList />
-          <span>Library ({jobsCount})</span>
-        </button>
         {currentId && (
-          <button type="button" className="mobile-dock-btn active" onClick={() => onNavigate("active-job")}>
+          <button
+            type="button"
+            className={`mobile-dock-btn ${activeTab === "workspace" ? "active" : ""}`}
+            onClick={() => onSelectTab("workspace")}
+          >
             <IconWaveform />
             <span>Active</span>
           </button>
         )}
-        <button type="button" className="mobile-dock-btn" onClick={() => onNavigate("datasets")}>
+        <button
+          type="button"
+          className={`mobile-dock-btn ${activeTab === "datasets" ? "active" : ""}`}
+          onClick={() => onSelectTab("datasets")}
+        >
           <IconLayers />
           <span>Datasets</span>
         </button>
-        <button type="button" className="mobile-dock-btn" onClick={() => onNavigate("spelling")}>
+        <button
+          type="button"
+          className={`mobile-dock-btn ${activeTab === "dictionary" ? "active" : ""}`}
+          onClick={() => onSelectTab("dictionary")}
+        >
           <IconBookOpen />
-          <span>Spellings</span>
+          <span>Dictionary</span>
         </button>
       </div>
     </div>
@@ -460,7 +500,24 @@ function MobileBottomDock({ jobsCount, currentId, onNavigate }) {
 // --- Main Application ---
 export default function App() {
   const [jobs, setJobs] = useState([]);
-  const [currentId, setCurrentId] = useState(null);
+
+  // URL Hash Routing: #library, #transcribe, #job/<id>, #datasets, #dictionary
+  const parseHash = () => {
+    const raw = (window.location.hash || "").replace(/^#/, "").trim();
+    if (raw.startsWith("job/")) {
+      const jid = raw.replace(/^job\//, "").trim();
+      return { tab: "workspace", jobId: jid || null };
+    }
+    if (raw === "active-job" || raw === "workspace") return { tab: "workspace", jobId: null };
+    if (raw === "transcribe" || raw === "ingest" || raw === "new") return { tab: "transcribe", jobId: null };
+    if (raw === "datasets" || raw === "dataset") return { tab: "datasets", jobId: null };
+    if (raw === "spelling" || raw === "dictionary") return { tab: "dictionary", jobId: null };
+    return { tab: "library", jobId: null };
+  };
+
+  const initial = parseHash();
+  const [activeTab, setActiveTab] = useState(initial.tab);
+  const [currentId, setCurrentId] = useState(initial.jobId);
   const [job, setJob] = useState(null);
   const [transcript, setTranscript] = useState(null);
   const [loadError, setLoadError] = useState("");
@@ -470,6 +527,39 @@ export default function App() {
   const [audioIsPlaying, setAudioIsPlaying] = useState(false);
   const [audioSeekRequest, setAudioSeekRequest] = useState(null);
   const [audioTogglePlayTrigger, setAudioTogglePlayTrigger] = useState(0);
+
+  // Sync with browser back/forward buttons
+  useEffect(() => {
+    const onHashChange = () => {
+      const parsed = parseHash();
+      setActiveTab(parsed.tab);
+      if (parsed.jobId) {
+        setCurrentId(parsed.jobId);
+      }
+    };
+    window.addEventListener("hashchange", onHashChange);
+    return () => window.removeEventListener("hashchange", onHashChange);
+  }, []);
+
+  const navigateToTab = useCallback((tab, jobId = null) => {
+    setActiveTab(tab);
+    if (jobId) {
+      setCurrentId(jobId);
+      window.location.hash = `job/${jobId}`;
+    } else if (tab === "workspace") {
+      window.location.hash = currentId ? `job/${currentId}` : "workspace";
+    } else {
+      window.location.hash = tab;
+    }
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }, [currentId]);
+
+  const openJob = useCallback((id) => {
+    setCurrentId(id);
+    setActiveTab("workspace");
+    window.location.hash = `job/${id}`;
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }, []);
 
   const handleAudioSeek = useCallback((time) => {
     setAudioSeekRequest({ time, ts: Date.now() });
@@ -534,34 +624,14 @@ export default function App() {
     };
   }, [currentId, refreshJobs]);
 
-  function openJob(id) {
-    setCurrentId(id);
-  }
-
-  const scrollTo = (id) => {
-    if (id === "top") {
-      window.scrollTo({ top: 0, behavior: "smooth" });
-      return;
-    }
-    const el = document.getElementById(id);
-    if (el) {
-      el.scrollIntoView({ behavior: "smooth", block: "start" });
-    }
-  };
-
-  useEffect(() => {
-    if (!currentId || !jobRef.current) return;
-    const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    jobRef.current.scrollIntoView({ behavior: still ? "auto" : "smooth", block: "start" });
-  }, [currentId]);
-
   return (
     <>
       <StickyNavbar
+        activeTab={activeTab}
+        onSelectTab={navigateToTab}
         jobsCount={jobs.length}
         currentId={currentId}
         usage={usage}
-        onNavigate={scrollTo}
       />
 
       <div className="page" id="top">
@@ -586,95 +656,130 @@ export default function App() {
           </p>
         </header>
 
-        {usage && <UsageCard usage={usage} />}
+        {activeTab === "library" && (
+          <div className="view-pane" id="library">
+            <JobLists
+              jobs={jobs}
+              currentId={currentId}
+              onOpen={openJob}
+              onRefresh={refreshJobs}
+            />
+          </div>
+        )}
 
-        <div id="ingest">
-          <SubmitForm
-            onCreated={(id) => {
-              openJob(id);
-              refreshJobs();
-            }}
-          />
-        </div>
+        {activeTab === "transcribe" && (
+          <div className="view-pane" id="ingest">
+            {usage && <UsageCard usage={usage} />}
+            <SubmitForm
+              onCreated={(id) => {
+                openJob(id);
+                refreshJobs();
+              }}
+            />
+          </div>
+        )}
 
-        {currentId && (
-          <section className="card" ref={jobRef} id="active-job">
-            <div className="active-job-topbar">
-              <button
-                type="button"
-                className="back-to-library-btn"
-                onClick={() => setCurrentId(null)}
-                title="Deselect active job and return to full library"
-              >
-                <IconArrowLeft /> Return to Library
-              </button>
-              <span className="mono small">Viewing: {currentId}</span>
-            </div>
+        {activeTab === "workspace" && (
+          <div className="view-pane" id="active-job">
+            {currentId ? (
+              <section className="card active-workspace-card" ref={jobRef}>
+                <div className="active-job-topbar">
+                  <button
+                    type="button"
+                    className="back-to-library-btn"
+                    onClick={() => navigateToTab("library")}
+                    title="Return to full library"
+                  >
+                    <IconArrowLeft /> Return to Library
+                  </button>
+                  <span className="mono small">Viewing: {currentId}</span>
+                </div>
 
-            {loadError && <p className="error">{loadError}</p>}
-            {job ? (
-              <>
-                <JobStatus
-                  job={job}
-                  onPromoted={(updated) => {
-                    setJob(updated);
-                    refreshJobs();
-                  }}
-                  audioIsPlaying={audioIsPlaying}
-                  onAudioPlayStateChange={setAudioIsPlaying}
-                  audioSeekRequest={audioSeekRequest}
-                  audioTogglePlayTrigger={audioTogglePlayTrigger}
-                />
-                {job.audio_available && job.status === "done" && (
-                  <AudioHealthCard
+                {loadError && <p className="error">{loadError}</p>}
+                {job ? (
+                  <>
+                    <JobStatus
+                      job={job}
+                      onPromoted={(updated) => {
+                        setJob(updated);
+                        refreshJobs();
+                      }}
+                      audioIsPlaying={audioIsPlaying}
+                      onAudioPlayStateChange={setAudioIsPlaying}
+                      audioSeekRequest={audioSeekRequest}
+                      audioTogglePlayTrigger={audioTogglePlayTrigger}
+                    />
+                    {job.audio_available && job.status === "done" && (
+                      <AudioHealthCard
+                        job={job}
+                        onUpdated={() => {
+                          if (currentId) getJob(currentId).then(setJob).catch(() => {});
+                          refreshJobs();
+                        }}
+                      />
+                    )}
+                  </>
+                ) : (
+                  <p className="muted">Loading job…</p>
+                )}
+                {transcript && (
+                  <TranscriptView
+                    transcript={transcript}
+                    comparison={comparison}
                     job={job}
+                    isPlaying={audioIsPlaying}
+                    onSeek={handleAudioSeek}
+                    onTogglePlay={handleAudioTogglePlay}
                     onUpdated={() => {
-                      if (currentId) getJob(currentId).then(setJob).catch(() => {});
-                      refreshJobs();
+                      if (currentId) {
+                        getTranscript(currentId).then(setTranscript).catch(() => {});
+                        getJob(currentId).then(setJob).catch(() => {});
+                        refreshJobs();
+                      }
                     }}
                   />
                 )}
-              </>
+              </section>
             ) : (
-              <p className="muted">Loading job…</p>
+              <div className="card empty-workspace-card">
+                <div className="empty-workspace-icon">
+                  <IconWaveform />
+                </div>
+                <h2>No Lecture Selected</h2>
+                <p className="muted">
+                  Select a lecture from the library to view its audio player, synchronized karaoke transcript, and segment editor.
+                </p>
+                <div className="empty-workspace-actions">
+                  <button type="button" className="btn primary" onClick={() => navigateToTab("library")}>
+                    <IconList /> Browse Library ({jobs.length})
+                  </button>
+                  <button type="button" className="btn secondary" onClick={() => navigateToTab("transcribe")}>
+                    <IconPlus /> Transcribe New Lecture
+                  </button>
+                </div>
+              </div>
             )}
-            {transcript && (
-              <TranscriptView
-                transcript={transcript}
-                comparison={comparison}
-                job={job}
-                isPlaying={audioIsPlaying}
-                onSeek={handleAudioSeek}
-                onTogglePlay={handleAudioTogglePlay}
-                onUpdated={() => {
-                  if (currentId) {
-                    getTranscript(currentId).then(setTranscript).catch(() => {});
-                    getJob(currentId).then(setJob).catch(() => {});
-                    refreshJobs();
-                  }
-                }}
-              />
-            )}
-          </section>
+          </div>
         )}
 
-        <div id="library">
-          <JobLists jobs={jobs} currentId={currentId} onOpen={openJob} onRefresh={refreshJobs} />
-        </div>
+        {activeTab === "datasets" && (
+          <div className="view-pane" id="datasets">
+            <DatasetHub onDatasetCreated={refreshJobs} />
+          </div>
+        )}
 
-        <div id="datasets">
-          <DatasetHub onDatasetCreated={refreshJobs} />
-        </div>
-
-        <div id="spelling">
-          <SpellingTable />
-        </div>
+        {activeTab === "dictionary" && (
+          <div className="view-pane" id="spelling">
+            <SpellingTable />
+          </div>
+        )}
       </div>
 
       <MobileBottomDock
+        activeTab={activeTab}
+        onSelectTab={navigateToTab}
         jobsCount={jobs.length}
         currentId={currentId}
-        onNavigate={scrollTo}
       />
     </>
   );

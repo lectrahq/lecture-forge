@@ -21,11 +21,12 @@ import os
 import re
 import secrets
 import shutil
+import threading
 import time
 from contextlib import asynccontextmanager
 
 from dotenv import load_dotenv
-from fastapi import BackgroundTasks, FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
@@ -33,7 +34,8 @@ load_dotenv()  # in Docker the variables already come from backend/.env via dock
 
 import db  # noqa: E402  (imported after load_dotenv so DATA_DIR is set)
 from downloader import (AudioError, check_ffmpeg, convert_to_wav,  # noqa: E402
-                        download_youtube_audio, is_youtube_url, wav_duration)
+                        download_youtube_audio, is_playlist_url, is_youtube_url,
+                        list_playlist_videos, wav_duration, youtube_video_id)
 from local_asr import LocalAsrError, transcribe_clips  # noqa: E402
 from normalise import (has_latin, load_english_map, map_coverage,  # noqa: E402
                        normalise_text, prepare_reference)
@@ -42,6 +44,9 @@ from segmenter import (build_segments, cut_chunks, find_silences,  # noqa: E402
 from transcriber import (TranscriptionError, api_key_configured,  # noqa: E402
                          credits_used_now, estimate_credits, get_credit_usage,
                          measured_cost, transcribe)
+from export_dataset import (create_dataset_archive, export_dataset,  # noqa: E402
+                            get_dataset_summary, list_datasets)
+from audio_health import get_cached_health  # noqa: E402
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 log = logging.getLogger("jobs")
@@ -62,8 +67,15 @@ async def lifespan(app: FastAPI):
         log.warning("marked %d unfinished job(s) as failed after restart", stale)
     if not api_key_configured():
         log.warning("ELEVENLABS_API_KEY is not set - transcription will fail until it is added to backend/.env")
+    waiting = db.count_queued()
+    if waiting:
+        log.info("%d job(s) still queued from before the restart - resuming", waiting)
+    worker = threading.Thread(target=worker_loop, name="job-worker", daemon=True)
+    worker.start()
     log.info("backend ready, data folder: %s", db.DATA_DIR)
     yield
+    _stop_worker.set()
+    worker.join(timeout=5)
 
 
 app = FastAPI(title="Lecture Audio Transcription Tool", lifespan=lifespan)
@@ -133,6 +145,9 @@ def public_job(job: dict) -> dict:
         "audio_available": os.path.isfile(os.path.join(job_dir(job["id"]), "audio.wav")),
         "has_local_transcript": os.path.isfile(os.path.join(job_dir(job["id"]), "local_transcript.txt")),
         "has_comparison": os.path.isfile(os.path.join(job_dir(job["id"]), "local_segments.json")),
+        "human_verified": os.path.isfile(os.path.join(job_dir(job["id"]), "transcript_corrected.json")),
+        "audio_health": get_cached_health(job_dir(job["id"]), recompute=False)
+        if os.path.isfile(os.path.join(job_dir(job["id"]), "audio_health.json")) else None,
         # A transcribe-only ElevenLabs job can become training data later, for free,
         # because the word timings needed to cut clips are already in transcript.json.
         "can_promote": (job["status"] == "done" and job["purpose"] == "transcribe"
@@ -248,6 +263,44 @@ def run_local_on_segments(job_id: str, folder: str, wav_path: str, segments: lis
     log.info("[%s] local transcript and comparison saved", job_id)
 
 
+# --- the job queue --------------------------------------------------------
+#
+# One lecture at a time, on purpose. Every submission used to start its own
+# background task immediately, so queueing twenty lectures meant twenty yt-dlp
+# downloads, twenty FFmpeg conversions and twenty ElevenLabs calls at once -
+# inside a container limited to 2 GB of memory and 2.5 processors. That does not
+# go slowly, it falls over: the container is killed and the whole batch is lost.
+#
+# A single worker thread makes a long collection run survivable, and because
+# waiting jobs simply sit in the database as 'queued', they also outlive a
+# restart instead of being thrown away.
+
+# How often to look for new work when the queue is empty. Submitting a job does
+# not need to feel instant - it needs to not take the server down.
+QUEUE_POLL_SECONDS = 3
+
+_stop_worker = threading.Event()
+
+
+def worker_loop() -> None:
+    """Runs queued jobs one after another until the server shuts down."""
+    log.info("job worker started")
+    while not _stop_worker.is_set():
+        job = db.next_queued_job()
+        if job is None:
+            _stop_worker.wait(QUEUE_POLL_SECONDS)
+            continue
+        try:
+            # run_job marks the job 'downloading' as its first act, so it leaves
+            # the queue immediately and cannot be picked up twice.
+            run_job(job["id"])
+        except Exception:
+            # run_job records its own failures; this is the last line of defence
+            # so that one bad lecture cannot kill the worker and strand the rest.
+            log.exception("[%s] unhandled error in worker", job["id"])
+    log.info("job worker stopped")
+
+
 def run_job(job_id: str) -> None:
     """The whole pipeline for one job. Runs in a background thread."""
     job = db.get_job(job_id)
@@ -315,6 +368,12 @@ def run_job(job_id: str) -> None:
         if engine == "both":
             run_local_on_segments(job_id, folder, wav_path, segments, keep_clips=wants_clips)
 
+        # 6. Pre-calculate acoustic health profile for the audio
+        try:
+            get_cached_health(folder, recompute=False)
+        except Exception:
+            pass
+
         db.update_job(job_id, status="done", segment_count=len(segments))
         log.info("[%s] done: %d segments%s", job_id, len(segments),
                  "" if wants_clips else " (transcript only, no training data)")
@@ -370,7 +429,7 @@ def usage():
 
 
 @app.post("/api/jobs")
-def create_youtube_job(request: YoutubeJobRequest, background_tasks: BackgroundTasks):
+def create_youtube_job(request: YoutubeJobRequest):
     url = request.url.strip()
     if not is_youtube_url(url):
         raise HTTPException(status_code=400, detail="That is not a valid YouTube video link.")
@@ -379,14 +438,115 @@ def create_youtube_job(request: YoutubeJobRequest, background_tasks: BackgroundT
     os.makedirs(job_dir(job_id))
     db.create_job(job_id, "youtube", parse_keyterms(request.keyterms),
                   engine=engine, purpose=purpose, source_url=url)
-    background_tasks.add_task(run_job, job_id)
-    log.info("[%s] created (youtube, engine=%s, purpose=%s)", job_id, engine, purpose)
-    return {"job_id": job_id}
+    # Not started here: the worker picks it up. See the job queue above.
+    log.info("[%s] queued (youtube, engine=%s, purpose=%s)", job_id, engine, purpose)
+    return {"job_id": job_id, "queued_ahead": max(0, db.count_queued() - 1)}
+
+
+class BatchJobRequest(BaseModel):
+    """Several YouTube links at once, one per line."""
+    urls: str
+    keyterms: list[str] | str = ""
+    engine: str = "elevenlabs"
+    purpose: str = "training"
+
+
+# Collecting twenty lectures through a one-link-at-a-time form is a chore, and a
+# chore is where mistakes happen - most of all picking the wrong engine, because
+# a lecture transcribed with the local model has no word timings and so can never
+# become training data. One paste, one engine, one purpose, for the whole batch.
+MAX_BATCH = 50
+
+
+@app.post("/api/jobs/batch")
+def create_batch_jobs(request: BatchJobRequest):
+    engine, purpose = check_choices(request.engine, request.purpose)
+    keyterms = parse_keyterms(request.keyterms)
+
+    lines = [line.strip() for line in request.urls.splitlines() if line.strip()]
+    if not lines:
+        raise HTTPException(status_code=400, detail="No links were given.")
+
+    # Reject the whole paste rather than quietly queueing the good half: finding
+    # out which three of twenty links were dropped is worse than pasting again.
+    bad = [line for line in lines
+           if not is_youtube_url(line) and not is_playlist_url(line)]
+    if bad:
+        raise HTTPException(
+            status_code=400,
+            detail=f"{len(bad)} of {len(lines)} lines are neither a YouTube video "
+                   f"nor a playlist link, starting with: {bad[0][:80]}")
+
+    # Expand any playlist into its videos. A course playlist is the natural way to
+    # hand over twenty lectures, and copying twenty links out of one by hand is
+    # exactly the sort of chore that ends with three of them missing.
+    wanted: list[str] = []
+    playlists = 0
+    for line in lines:
+        if is_playlist_url(line):
+            playlists += 1
+            try:
+                videos = list_playlist_videos(line, MAX_BATCH + 1)
+            except AudioError as e:
+                # Without this the user gets a bare "Internal Server Error" for the
+                # ordinary case of a mistyped or private playlist.
+                raise HTTPException(status_code=400, detail=str(e)) from None
+            if not videos:
+                raise HTTPException(
+                    status_code=400,
+                    detail="That playlist has no videos this tool can read. "
+                           "It may be private, or empty.")
+            wanted.extend(v["url"] for v in videos)
+        else:
+            wanted.append(line)
+
+    # Deduplicate by video id, so the same lecture written three different ways
+    # (youtu.be/ID, watch?v=ID, watch?v=ID&list=...) is only queued once.
+    seen_ids, unique = set(), []
+    for url in wanted:
+        video_id = youtube_video_id(url)
+        if video_id and video_id not in seen_ids:
+            seen_ids.add(video_id)
+            unique.append(url)
+
+    # Skip lectures already in the library. Without this, re-pasting a playlist
+    # after adding one video would transcribe - and pay for - all the others again.
+    already = {youtube_video_id(j["source_url"]): j["id"]
+               for j in db.list_jobs(limit=1000)
+               if j.get("source_url") and youtube_video_id(j["source_url"])}
+    fresh = [u for u in unique if youtube_video_id(u) not in already]
+    skipped_existing = len(unique) - len(fresh)
+
+    if len(fresh) > MAX_BATCH:
+        raise HTTPException(
+            status_code=400,
+            detail=f"That comes to {len(fresh)} new lectures; {MAX_BATCH} at a time "
+                   "is the limit. Split the list.")
+    if not fresh:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Nothing new to add: all {len(unique)} lecture(s) are already here.")
+
+    created = []
+    for url in fresh:
+        job_id = new_job_id()
+        os.makedirs(job_dir(job_id))
+        db.create_job(job_id, "youtube", keyterms,
+                      engine=engine, purpose=purpose, source_url=url)
+        created.append(job_id)
+
+    log.info("queued %d job(s) from a batch (%d playlist(s), %d already here, "
+             "engine=%s, purpose=%s)",
+             len(created), playlists, skipped_existing, engine, purpose)
+    return {"job_ids": created, "queued": len(created),
+            "playlists_expanded": playlists,
+            "duplicates_ignored": len(wanted) - len(unique),
+            "already_in_library": skipped_existing,
+            "queued_total": db.count_queued()}
 
 
 @app.post("/api/jobs/upload")
-def create_upload_job(background_tasks: BackgroundTasks,
-                      file: UploadFile = File(...),
+def create_upload_job(file: UploadFile = File(...),
                       keyterms: str = Form(""),
                       engine: str = Form("elevenlabs"),
                       purpose: str = Form("training")):
@@ -410,7 +570,7 @@ def create_upload_job(background_tasks: BackgroundTasks,
     db.create_job(job_id, "upload", parse_keyterms(keyterms),
                   engine=engine, purpose=purpose, filename=filename)
     db.update_job(job_id, title=os.path.splitext(filename)[0])
-    background_tasks.add_task(run_job, job_id)
+    # Not started here: the worker picks it up. See the job queue above.
     log.info("[%s] created (upload: %s, engine=%s, purpose=%s)", job_id, filename, engine, purpose)
     return {"job_id": job_id}
 
@@ -580,6 +740,34 @@ def set_english_spelling(word: str, update: SpellingUpdate):
             "coverage": map_coverage(ENGLISH_MAP_PATH, data.get("counts", {}))}
 
 
+class BulkApproveRequest(BaseModel):
+    words: list[str] | None = None
+
+
+@app.post("/api/english-map/bulk-approve")
+def bulk_approve_spellings(request: BulkApproveRequest | None = None):
+    """Approve proposed Malayalam transliterations in bulk to unlock model comparison scores."""
+    data = read_english_map()
+    mapping = data.get("map", {})
+    status = data.setdefault("status", {})
+    target_words = request.words if (request and request.words) else list(mapping.keys())
+    approved_count = 0
+    for w in target_words:
+        w_lower = w.strip().lower()
+        spelling = mapping.get(w_lower, "")
+        if spelling and not has_latin(spelling):
+            status[w_lower] = "checked"
+            data.setdefault("source", {})[w_lower] = "approved"
+            approved_count += 1
+    with open(ENGLISH_MAP_PATH, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=1, sort_keys=True)
+    log.info("bulk approved %d spellings", approved_count)
+    return {
+        "approved": approved_count,
+        "coverage": map_coverage(ENGLISH_MAP_PATH, data.get("counts", {})),
+    }
+
+
 @app.get("/api/jobs/{job_id}/audio")
 def get_audio(job_id: str):
     """Download the extracted 16 kHz mono WAV (streamed from disk, not loaded into memory)."""
@@ -603,19 +791,52 @@ def get_transcript(job_id: str):
     if job["engine"] == "local":
         with open(os.path.join(folder, "local_transcript.txt"), encoding="utf-8") as f:
             text = f.read().strip()
+        corrected_path = os.path.join(folder, "transcript_corrected.json")
+        is_corrected = os.path.isfile(corrected_path)
+        segments = []
+        if is_corrected:
+            try:
+                with open(corrected_path, encoding="utf-8") as f:
+                    segments = json.load(f)
+            except Exception:
+                pass
         return {
             "job_id": job_id,
             "title": public_job(job)["title"],
             "language_code": None,
             "source": "local",
             "text": text,
-            "segments": [],
+            "local_text": None,
+            "segments": segments,
+            "human_verified": is_corrected,
+            "original_segments": None,
         }
 
     with open(os.path.join(folder, "transcript.txt"), encoding="utf-8") as f:
         text = f.read().strip()
-    with open(os.path.join(folder, "segments.json"), encoding="utf-8") as f:
-        segments = json.load(f)
+    corrected_path = os.path.join(folder, "transcript_corrected.json")
+    is_corrected = os.path.isfile(corrected_path)
+    if is_corrected:
+        try:
+            with open(corrected_path, encoding="utf-8") as f:
+                segments = json.load(f)
+        except Exception:
+            with open(os.path.join(folder, "segments.json"), encoding="utf-8") as f:
+                segments = json.load(f)
+    elif os.path.isfile(os.path.join(folder, "segments.json")):
+        with open(os.path.join(folder, "segments.json"), encoding="utf-8") as f:
+            segments = json.load(f)
+    else:
+        segments = []
+
+    original_segments = None
+    if is_corrected and os.path.isfile(os.path.join(folder, "segments.json")):
+        try:
+            with open(os.path.join(folder, "segments.json"), encoding="utf-8") as f:
+                original_segments = json.load(f)
+        except Exception:
+            pass
+
     with open(os.path.join(folder, "transcript.json"), encoding="utf-8") as f:
         language = json.load(f).get("language_code")
 
@@ -632,9 +853,204 @@ def get_transcript(job_id: str):
         "source": "elevenlabs",
         "text": text,
         "local_text": local_text,
+        "human_verified": is_corrected,
         "segments": [
             # 'file' is only present on training jobs, where the clips were kept.
             {"start": s["start"], "end": s["end"], "text": s["text"], "file": s.get("file")}
             for s in segments
         ],
+        "original_segments": [
+            {"start": s["start"], "end": s["end"], "text": s["text"], "file": s.get("file")}
+            for s in original_segments
+        ] if original_segments else None,
     }
+
+
+@app.get("/api/jobs/{job_id}/segments/{filename}")
+def get_segment_clip(job_id: str, filename: str):
+    """Stream a single cut audio clip (.wav) for interactive browser playback."""
+    get_job_or_404(job_id)
+    safe_name = os.path.basename(filename)
+    if not safe_name.endswith(".wav"):
+        raise HTTPException(status_code=400, detail="Clip must be a .wav file.")
+    clip_path = os.path.join(job_dir(job_id), "segments", safe_name)
+    if not os.path.isfile(clip_path):
+        raise HTTPException(status_code=404, detail="Segment clip file not found.")
+    return FileResponse(clip_path, media_type="audio/wav")
+
+
+class CorrectionSegment(BaseModel):
+    start: float
+    end: float
+    text: str
+    file: str | None = None
+
+
+class CorrectionsRequest(BaseModel):
+    segments: list[CorrectionSegment]
+    verified: bool = True
+
+
+@app.put("/api/jobs/{job_id}/transcript/corrections")
+def save_transcript_corrections(job_id: str, request: CorrectionsRequest):
+    """Save human-verified Malayalam transcript corrections and sync to NeMo training manifest."""
+    job = get_job_or_404(job_id)
+    folder = job_dir(job_id)
+
+    normalized_segments = []
+    manifest_lines = []
+    for s in request.segments:
+        cleaned_text = normalise_text(s.text)
+        duration = round(s.end - s.start, 3)
+        item = {
+            "start": round(s.start, 3),
+            "end": round(s.end, 3),
+            "duration": duration,
+            "text": cleaned_text,
+            "file": s.file,
+        }
+        normalized_segments.append(item)
+        if s.file:
+            manifest_lines.append(json.dumps({
+                "audio_filepath": s.file,
+                "duration": duration,
+                "text": cleaned_text,
+            }, ensure_ascii=False))
+
+    corrected_path = os.path.join(folder, "transcript_corrected.json")
+    with open(corrected_path, "w", encoding="utf-8") as f:
+        json.dump(normalized_segments, f, ensure_ascii=False, indent=1)
+
+    if manifest_lines:
+        with open(os.path.join(folder, "manifest.jsonl"), "w", encoding="utf-8") as f:
+            f.write("\n".join(manifest_lines) + ("\n" if manifest_lines else ""))
+
+    if normalized_segments:
+        full_text = " ".join(s["text"] for s in normalized_segments if s["text"])
+        with open(os.path.join(folder, "transcript_corrected.txt"), "w", encoding="utf-8") as f:
+            f.write(full_text + "\n")
+
+    log.info("[%s] saved %d human-corrected segments", job_id, len(normalized_segments))
+    return {"ok": True, "human_verified": True, "segment_count": len(normalized_segments)}
+
+
+@app.delete("/api/jobs/{job_id}/transcript/corrections")
+def revert_transcript_corrections(job_id: str):
+    """Revert human corrections back to the automated transcription."""
+    get_job_or_404(job_id)
+    folder = job_dir(job_id)
+    corrected_path = os.path.join(folder, "transcript_corrected.json")
+    if os.path.isfile(corrected_path):
+        os.remove(corrected_path)
+    corrected_txt = os.path.join(folder, "transcript_corrected.txt")
+    if os.path.isfile(corrected_txt):
+        os.remove(corrected_txt)
+
+    segments_path = os.path.join(folder, "segments.json")
+    if os.path.isfile(segments_path):
+        with open(segments_path, encoding="utf-8") as f:
+            orig = json.load(f)
+        manifest_lines = [
+            json.dumps({
+                "audio_filepath": s["file"],
+                "duration": s.get("duration", round(s["end"] - s["start"], 3)),
+                "text": s["text"],
+            }, ensure_ascii=False)
+            for s in orig if s.get("file")
+        ]
+        with open(os.path.join(folder, "manifest.jsonl"), "w", encoding="utf-8") as f:
+            f.write("\n".join(manifest_lines) + ("\n" if manifest_lines else ""))
+
+    log.info("[%s] reverted human corrections to automated segments", job_id)
+    return {"ok": True, "human_verified": False}
+
+
+@app.get("/api/jobs/{job_id}/health")
+def api_get_audio_health(job_id: str):
+    """Retrieve acoustic quality & health analysis (SNR, RMS loudness, clipping, speech activity)."""
+    get_job_or_404(job_id)
+    folder = job_dir(job_id)
+    health = get_cached_health(folder, recompute=False)
+    if not health:
+        raise HTTPException(status_code=404, detail="Audio file not available for acoustic analysis.")
+    return health
+
+
+@app.post("/api/jobs/{job_id}/health/analyze")
+def api_reanalyze_audio_health(job_id: str):
+    """Force re-analysis of audio acoustics."""
+    get_job_or_404(job_id)
+    folder = job_dir(job_id)
+    health = get_cached_health(folder, recompute=True)
+    if not health:
+        raise HTTPException(status_code=400, detail="Could not analyze audio file.")
+    return health
+
+
+# ---------------------------------------------------------------- Dataset Export (Part 2 Hub)
+
+class DatasetExportRequest(BaseModel):
+    train: float = 0.8
+    val: float = 0.1
+    test: float = 0.1
+    name: str | None = None
+    pin_test: list[str] = []
+    exclude: list[str] = []
+    copy: bool = False
+
+
+@app.get("/api/dataset/summary")
+def api_dataset_summary():
+    """Summary of training lectures, collected hours, and existing dataset exports."""
+    return get_dataset_summary()
+
+
+@app.post("/api/dataset/export")
+def api_export_dataset(request: DatasetExportRequest):
+    """Package and export collected training lectures into NeMo train/val/test splits."""
+    ratios = {"train": request.train, "val": request.val, "test": request.test}
+    try:
+        info = export_dataset(
+            ratios=ratios,
+            name=request.name,
+            pin_test=request.pin_test,
+            exclude=request.exclude,
+            copy=request.copy,
+            dry_run=False,
+            make_archive=True,
+        )
+        return info
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        log.exception("Dataset export failed")
+        raise HTTPException(status_code=500, detail=f"Export failed: {e}")
+
+
+@app.get("/api/dataset/download/{name}")
+def api_download_dataset(name: str):
+    """Download the full dataset tarball (.tar.gz) containing audio clips and manifests."""
+    safe_name = re.sub(r"[^a-zA-Z0-9_\-]", "", name)
+    archive_path = os.path.join(db.DATA_DIR, "datasets", f"{safe_name}.tar.gz")
+    if not os.path.isfile(archive_path):
+        dataset_folder = os.path.join(db.DATA_DIR, "datasets", safe_name)
+        if os.path.isdir(dataset_folder):
+            try:
+                archive_path = create_dataset_archive(safe_name)
+            except Exception as e:
+                raise HTTPException(status_code=500, detail=f"Failed packaging archive: {e}")
+        else:
+            raise HTTPException(status_code=404, detail=f"Dataset '{name}' not found.")
+    return FileResponse(archive_path, media_type="application/gzip", filename=f"{safe_name}.tar.gz")
+
+
+@app.get("/api/dataset/info/{name}")
+def api_get_dataset_info(name: str):
+    """Metadata and split details for an exported dataset."""
+    safe_name = re.sub(r"[^a-zA-Z0-9_\-]", "", name)
+    info_path = os.path.join(db.DATA_DIR, "datasets", safe_name, "dataset_info.json")
+    if not os.path.isfile(info_path):
+        raise HTTPException(status_code=404, detail="Dataset info not found.")
+    with open(info_path, encoding="utf-8") as f:
+        return json.load(f)
+

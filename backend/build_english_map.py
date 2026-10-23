@@ -154,10 +154,12 @@ def main() -> None:
                         help="propose a Malayalam spelling for empty entries (needs ai4bharat-transliteration)")
     parser.add_argument("--derive", action="store_true",
                         help="propose spellings from jobs transcribed with both models")
+    parser.add_argument("--approve-all", action="store_true",
+                        help="mark all non-empty proposed spellings as checked/approved")
     parser.add_argument("--report", action="store_true", help="show coverage only, change nothing")
     args = parser.parse_args()
-    if not (args.collect or args.fill or args.derive or args.report):
-        parser.error("choose --collect, --derive, --fill or --report")
+    if not (args.collect or args.fill or args.derive or args.approve_all or args.report):
+        parser.error("choose --collect, --derive, --fill, --approve-all or --report")
 
     words = collect_words()
     data = load_existing()
@@ -231,6 +233,18 @@ def main() -> None:
                 print(f"  {i}/{len(todo)}")
         data["counts"] = dict(words.most_common())
         save(data)
+
+    if args.approve_all:
+        from normalise import has_latin
+        approved_count = 0
+        for word, spelling in data.get("map", {}).items():
+            if spelling and not has_latin(spelling):
+                data["status"][word] = "checked"
+                data.setdefault("source", {})[word] = "approved"
+                approved_count += 1
+        data["counts"] = dict(words.most_common())
+        save(data)
+        print(f"approved {approved_count} proposed spellings.")
 
     report(data, words)
 

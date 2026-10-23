@@ -125,20 +125,75 @@ def list_jobs(limit: int = 200, purpose: str | None = None) -> list[dict]:
 
 
 def usage_totals() -> dict:
-    """How much this tool has transcribed successfully, over all time."""
+    """How much this tool has transcribed successfully, over all time, with separate timers for each engine."""
     with _connect() as conn:
         count, seconds = conn.execute(
             "SELECT COUNT(*), COALESCE(SUM(duration), 0) FROM jobs WHERE status = 'done'"
         ).fetchone()
-    return {"jobs_done": count, "audio_seconds": round(seconds, 1)}
+
+        el_count, el_audio, el_time = conn.execute(
+            """
+            SELECT COUNT(*),
+                   COALESCE(SUM(duration), 0),
+                   COALESCE(SUM(elevenlabs_seconds), 0)
+            FROM jobs
+            WHERE status = 'done' AND (engine IN ('elevenlabs', 'both') OR elevenlabs_seconds IS NOT NULL)
+            """
+        ).fetchone()
+
+        local_count, local_audio, local_time = conn.execute(
+            """
+            SELECT COUNT(*),
+                   COALESCE(SUM(duration), 0),
+                   COALESCE(SUM(local_seconds), 0)
+            FROM jobs
+            WHERE status = 'done' AND (engine IN ('local', 'both') OR local_seconds IS NOT NULL)
+            """
+        ).fetchone()
+
+    return {
+        "jobs_done": count,
+        "audio_seconds": round(seconds, 1),
+        "elevenlabs": {
+            "jobs_done": el_count,
+            "audio_seconds": round(el_audio, 1),
+            "processing_seconds": round(el_time, 1),
+        },
+        "local": {
+            "jobs_done": local_count,
+            "audio_seconds": round(local_audio, 1),
+            "processing_seconds": round(local_time, 1),
+        },
+    }
 
 
 def fail_unfinished_jobs() -> int:
-    """Called at startup: jobs that were mid-way when the server stopped can't resume."""
+    """Called at startup: jobs that were mid-way when the server stopped can't resume.
+
+    Jobs still 'queued' are deliberately left alone. They had not started, so there
+    is nothing half-finished about them - the worker picks them up again once the
+    server is back. Failing them would throw away a whole queue of lectures because
+    the server restarted while they were waiting their turn.
+    """
     with _connect() as conn:
         cursor = conn.execute(
             "UPDATE jobs SET status = 'failed', error = ?, updated_at = ?"
-            " WHERE status NOT IN ('done', 'failed')",
+            " WHERE status NOT IN ('done', 'failed', 'queued')",
             ("The server restarted while this job was running. Please submit it again.", _now()),
         )
         return cursor.rowcount
+
+
+def next_queued_job() -> dict | None:
+    """The job that has been waiting longest, or None if the queue is empty."""
+    with _connect() as conn:
+        row = conn.execute(
+            "SELECT * FROM jobs WHERE status = 'queued' ORDER BY created_at LIMIT 1"
+        ).fetchone()
+        return dict(row) if row else None
+
+
+def count_queued() -> int:
+    with _connect() as conn:
+        return conn.execute(
+            "SELECT COUNT(*) FROM jobs WHERE status = 'queued'").fetchone()[0]

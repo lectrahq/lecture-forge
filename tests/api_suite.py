@@ -62,6 +62,14 @@ def post(path: str, **kwargs):
     return httpx.post(API + path, timeout=120, **kwargs)
 
 
+def put(path: str, **kwargs):
+    return httpx.put(API + path, timeout=60, **kwargs)
+
+
+def delete(path: str, **kwargs):
+    return httpx.delete(API + path, timeout=60, **kwargs)
+
+
 def credits_now() -> int | None:
     """Uncached credit reading, straight from ElevenLabs.
 
@@ -183,6 +191,29 @@ def test_local_job():
 
     check("cannot be promoted (no word timings)", job["can_promote"], False)
     check("promote is refused", post(f"/jobs/{job_id}/promote").status_code, 409)
+
+    # Acoustic quality & audio health inspection
+    health_resp = get(f"/jobs/{job_id}/health")
+    check("audio health endpoint responds", health_resp.status_code, 200)
+    health_data = health_resp.json()
+    check_true("audio health has score", 0 <= health_data.get("score", -1) <= 100)
+    check_true("audio health has snr_db", "snr_db" in health_data)
+    check_true("audio health has rating", health_data.get("rating") in ("Optimal", "Good", "Fair", "Poor"))
+
+    reanalyze_resp = post(f"/jobs/{job_id}/health/analyze")
+    check("reanalyze audio health succeeds", reanalyze_resp.status_code, 200)
+
+    # Human verification and corrections
+    save_resp = put(f"/jobs/{job_id}/transcript/corrections", json={
+        "segments": [{"start": 0.0, "end": 2.0, "text": "പരീക്ഷണ തിരുത്തൽ", "file": None}],
+        "verified": True,
+    })
+    check("save human corrections succeeds", save_resp.status_code, 200)
+    check_true("human_verified marked true", get(f"/jobs/{job_id}/transcript").json().get("human_verified"))
+
+    revert_resp = delete(f"/jobs/{job_id}/transcript/corrections")
+    check("revert human corrections succeeds", revert_resp.status_code, 200)
+    check("human_verified marked false", get(f"/jobs/{job_id}/transcript").json().get("human_verified"), False)
 
     after = credits_now()
     check("NO ElevenLabs credits spent", after, before)
@@ -318,6 +349,123 @@ def test_english_map():
               any(e["word"] == word for e in left), False)
 
 
+def test_batch_and_queue():
+    """Submitting many lectures at once, and running them one at a time.
+
+    The queue is what makes a twenty-lecture collection run possible. Before it,
+    every submission started its own download, conversion and API call straight
+    away, so one paste of twenty links would have put twenty of each inside a
+    container limited to 2 GB.
+    """
+    print("\n=== batch submission and the job queue", flush=True)
+
+    bad = post("/jobs/batch", json={"urls": ""})
+    check("an empty paste is refused", bad.status_code, 400)
+
+    bad = post("/jobs/batch", json={"urls": "https://example.com/not-youtube"})
+    check("a non-YouTube link is refused", bad.status_code, 400)
+
+    # Partial success would be worse than none: working out which three of twenty
+    # links were silently dropped is harder than pasting the list again.
+    mixed = post("/jobs/batch", json={
+        "urls": "https://youtu.be/ewICskAJzHY\nhttps://example.com/nope"})
+    check("one bad link rejects the whole paste", mixed.status_code, 400)
+    check_true("the reply names a rejected link",
+               "neither a YouTube video nor a playlist" in mixed.text)
+
+    too_many = post("/jobs/batch", json={
+        "urls": "\n".join(f"https://youtu.be/vid{i:08d}" for i in range(60))})
+    check("more than 50 links is refused", too_many.status_code, 400)
+
+    # Well-formed ids that do not exist: they fail at the download step within
+    # seconds, so the queue can be watched draining without spending credits.
+    ids = ["zzzSUITEz01", "zzzSUITEz02", "zzzSUITEz03"]
+    urls = "\n".join(f"https://youtu.be/{i}" for i in ids)
+    reply = post("/jobs/batch", json={
+        "urls": urls + "\n" + f"https://youtu.be/{ids[0]}",
+        "engine": "local", "purpose": "transcribe"})
+    check("a valid batch is accepted", reply.status_code, 200)
+    body = reply.json()
+    _created_jobs.extend(body["job_ids"])
+    check("three distinct lectures queued", body["queued"], 3)
+    check("the repeated link was dropped", body["duplicates_ignored"], 1)
+
+    # Only one job may be in flight at any moment. uvicorn runs a single process
+    # with a single worker thread, so this is structural rather than a race that
+    # merely has not been lost yet.
+    most_at_once = 0
+    mine = {}
+    deadline = time.time() + 180
+    while time.time() < deadline:
+        time.sleep(2)
+        mine = {j["job_id"]: j["status"] for j in get("/jobs").json()
+                if j["job_id"] in body["job_ids"]}
+        running = [s for s in mine.values() if s not in ("queued", "done", "failed")]
+        most_at_once = max(most_at_once, len(running))
+        if all(s in ("done", "failed") for s in mine.values()):
+            break
+    check_true("every queued lecture finished",
+               bool(mine) and all(s in ("done", "failed") for s in mine.values()))
+    check_true(f"never more than one ran at a time (saw {most_at_once})",
+               most_at_once <= 1)
+
+
+def test_playlists_and_duplicates():
+    """Playlist expansion, and never paying to transcribe the same lecture twice.
+
+    A course playlist is how twenty lectures actually arrive, and re-pasting one
+    after it gains a video must not re-transcribe the rest - at roughly 70 credits
+    a minute, that mistake is expensive rather than merely annoying.
+    """
+    print("\n=== playlists and duplicate lectures", flush=True)
+
+    sys.path.insert(0, "/app")
+    from downloader import is_playlist_url, is_youtube_url, youtube_video_id
+
+    check("a playlist link is recognised",
+          is_playlist_url("https://www.youtube.com/playlist?list=PLabc123"), True)
+    # This one names a single video and happens to sit in a list. Treating it as a
+    # playlist would queue the whole course when one lecture was asked for.
+    check("watch?v=...&list=... is a video, not a playlist",
+          is_playlist_url("https://www.youtube.com/watch?v=ewlCskAJzHY&list=PLabc"), False)
+    check("...and is still accepted as a video",
+          is_youtube_url("https://www.youtube.com/watch?v=ewlCskAJzHY&list=PLabc"), True)
+    check("a playlist link is not a video link",
+          is_youtube_url("https://www.youtube.com/playlist?list=PLabc123"), False)
+
+    # The same lecture written three ways must give one id, or duplicate detection
+    # silently fails and the lecture is transcribed again.
+    ids = {youtube_video_id(u) for u in (
+        "https://youtu.be/ewlCskAJzHY",
+        "https://www.youtube.com/watch?v=ewlCskAJzHY",
+        "https://www.youtube.com/watch?v=ewlCskAJzHY&list=PLabc&index=3&pp=xyz")}
+    check("three spellings of one lecture give one id", ids, {"ewlCskAJzHY"})
+
+    bad = post("/jobs/batch", json={"urls": "https://example.com/x"})
+    check("neither video nor playlist is refused", bad.status_code, 400)
+
+    missing = post("/jobs/batch", json={
+        "urls": "https://www.youtube.com/playlist?list=PLdoesNotExistAtAll12345"})
+    check("an unreadable playlist gives a readable error", missing.status_code, 400)
+    check_true("...and not a bare server error",
+               "could not be read" in missing.text)
+
+    # Anything already collected must be skipped rather than queued again.
+    existing = [j for j in get("/jobs").json() if j.get("source_url")]
+    if existing:
+        url = existing[0]["source_url"]
+        vid = youtube_video_id(url)
+        again = post("/jobs/batch", json={"urls": url})
+        check("a lecture already collected is not queued again", again.status_code, 400)
+        check_true("...and says so plainly", "already here" in again.text)
+        if vid:
+            other = post("/jobs/batch", json={
+                "urls": f"https://www.youtube.com/watch?v={vid}&list=PLzzz&index=9"})
+            check("...even written as a different kind of link", other.status_code, 400)
+    else:
+        print("  SKIP  no collected lecture to compare against", flush=True)
+
+
 def main():
     parser = argparse.ArgumentParser(description="End-to-end checks for the backend.")
     parser.add_argument("--include-paid", action="store_true",
@@ -339,6 +487,8 @@ def main():
             print("\n=== ElevenLabs checks SKIPPED (pass --include-paid to run them)", flush=True)
         test_export_filters()
         test_english_map()
+        test_batch_and_queue()
+        test_playlists_and_duplicates()
     finally:
         cleanup()
 

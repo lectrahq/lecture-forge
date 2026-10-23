@@ -39,6 +39,17 @@ export function createYoutubeJob(url, keyterms, engine, purpose) {
   });
 }
 
+// Many YouTube links at once, one per line. The whole paste is rejected if any
+// line is not a video link, so a bad line can never be silently dropped from a
+// batch of twenty.
+export function createBatchJobs(urls, keyterms, engine, purpose) {
+  return request("/api/jobs/batch", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ urls, keyterms, engine, purpose }),
+  });
+}
+
 export const getJob = (id) => request(`/api/jobs/${encodeURIComponent(id)}`);
 export const getTranscript = (id) =>
   request(`/api/jobs/${encodeURIComponent(id)}/transcript`);
@@ -70,6 +81,24 @@ export const setEnglishSpelling = (word, spelling, approved) =>
     body: JSON.stringify({ spelling, approved }),
   });
 
+export const bulkApproveSpellings = (words) =>
+  request("/api/english-map/bulk-approve", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ words: words || null }),
+  });
+
+// Dataset Export (Part 2 Bridge)
+export const getDatasetSummary = () => request("/api/dataset/summary");
+export const exportDataset = (options) =>
+  request("/api/dataset/export", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(options),
+  });
+export const datasetDownloadUrl = (name) => `/api/dataset/download/${encodeURIComponent(name)}`;
+export const getDatasetInfo = (name) => request(`/api/dataset/info/${encodeURIComponent(name)}`);
+
 // Uploads use XMLHttpRequest instead of fetch because only XHR reports
 // upload progress, which matters for files of hundreds of megabytes.
 export function uploadFile(file, keyterms, engine, purpose, onProgress) {
@@ -99,3 +128,28 @@ export function uploadFile(file, keyterms, engine, purpose, onProgress) {
     xhr.send(form);
   });
 }
+
+// In-Browser Audio Player & Segment Verification
+export const segmentAudioUrl = (jobId, filename) =>
+  `/api/jobs/${encodeURIComponent(jobId)}/segments/${encodeURIComponent(filename.split("/").pop())}`;
+
+export const saveTranscriptCorrections = (jobId, segments, verified = true) =>
+  request(`/api/jobs/${encodeURIComponent(jobId)}/transcript/corrections`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ segments, verified }),
+  });
+
+export const revertTranscriptCorrections = (jobId) =>
+  request(`/api/jobs/${encodeURIComponent(jobId)}/transcript/corrections`, {
+    method: "DELETE",
+  });
+
+// Audio Health & Acoustic Quality Inspector
+export const getAudioHealth = (jobId) =>
+  request(`/api/jobs/${encodeURIComponent(jobId)}/health`);
+
+export const reanalyzeAudioHealth = (jobId) =>
+  request(`/api/jobs/${encodeURIComponent(jobId)}/health/analyze`, {
+    method: "POST",
+  });

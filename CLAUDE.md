@@ -11,7 +11,7 @@ folders are copied to a GPU server to fine-tune AI4Bharat IndicConformer for Man
 be training-ready, not just display-ready.
 
 ## Environment
-- Code is edited on the developer's Windows PC in `F:\Project Phase 1`.
+- Code is edited on the developer's Windows PC in `F:\LectraHQ\Lecture Forge\Lecture Forge Working Dir`.
 - It is copied to the VPS with `deploy.ps1` (tar + scp + ssh) and runs **only on the
   VPS, only via Docker Compose**. The VPS host, user and SSH port are deliberately not
   recorded here; they live in `~/.ssh/config` under the alias below and nowhere in

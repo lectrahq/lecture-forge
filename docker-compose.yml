@@ -23,7 +23,9 @@ services:
       - ./data:/data                # audio, transcripts, segments and the SQLite DB
       - ./tests:/app/tests:ro       # the regression suite, run with docker compose exec
     ports:
-      - "127.0.0.1:8000:8000"       # only reachable from the VPS itself (for curl tests)
+      # Parameterised because the live and test stacks run side by side on one
+      # machine and cannot both claim the same port. Each .env sets its own.
+      - "127.0.0.1:${BACKEND_HOST_PORT:-8000}:8000"
     # Caps so one bad file cannot take the whole machine down with it.
     # memswap_limit equal to mem_limit means this container gets NO swap: on
     # cgroup v2 an unset value would quietly allow another 3g of swap on top.
@@ -84,10 +86,12 @@ services:
   # This one stays root because it binds ports 80 and 443.
   caddy:
     build: ./frontend
+    # Nginx Proxy Manager owns ports 80 and 443 and terminates HTTPS. Caddy is
+    # reached by container name over web-gateway, and this localhost port is kept
+    # only so the stack can be curled directly on the server when debugging.
+    container_name: ${CADDY_CONTAINER_NAME:-lecture-caddy}
     ports:
-      - "80:80"
-      - "443:443"
-      - "443:443/udp"               # HTTP/3
+      - "127.0.0.1:${CADDY_HOST_PORT:-8080}:80"
     environment:
       DOMAIN: ${DOMAIN:?set DOMAIN in .env}
       BASIC_AUTH_USER: ${BASIC_AUTH_USER:?set BASIC_AUTH_USER in .env}
@@ -102,7 +106,18 @@ services:
     pids_limit: 256
     depends_on:
       - backend
+    networks:
+      - default
+      - web-gateway            # so nginx-proxy-manager can reach it by name
     restart: unless-stopped
+
+networks:
+  default:
+  # Created once on the server with: docker network create web-gateway
+  # It is shared with the Nginx Proxy Manager stack, which is why it is external
+  # rather than owned by this file.
+  web-gateway:
+    external: true
 
 volumes:
   caddy_data:

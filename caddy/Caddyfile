@@ -1,11 +1,21 @@
-# Caddy: the public web server.
-# - gets and renews the HTTPS certificate automatically for {$DOMAIN}
+# Caddy: the web server for this site.
 # - asks for a username/password (HTTP basic auth) on the whole site
 # - serves the built React website, and forwards /api/* to the FastAPI backend
+# - sets the browser security headers
+#
+# It does NOT handle HTTPS or certificates any more. Nginx Proxy Manager sits in
+# front, owns ports 80 and 443, and terminates TLS; Caddy only ever sees plain
+# HTTP from it over the shared web-gateway network.
+#
+# Hence ":80" rather than "{$DOMAIN}". Matching on the domain would mean this
+# block only answered requests for one hostname, so the same image could not
+# serve both the live site and the test one - and, worse, Caddy would switch its
+# automatic HTTPS back on and answer the proxy with a 308 redirect to itself,
+# which is an infinite redirect loop rather than an error anyone can read.
 #
 # Values in {$...} come from the single root .env file (see docker-compose.yml).
 
-{$DOMAIN} {
+:80 {
 	basic_auth {
 		{$BASIC_AUTH_USER} {$BASIC_AUTH_HASH}
 	}

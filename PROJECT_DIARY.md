@@ -5,6 +5,232 @@ deployed; MINOR = small fix, wording or documentation change.
 
 ---
 
+## 2026-10-23 — Dedicated dual-engine timers and desktop/mobile responsive UI redesign [MAJOR]
+
+**What changed:** Transcribing with both ElevenLabs (cloud) and the local IndicConformer model (on-premise neural ASR) previously lumped all audio processing into a single combined timer in the header widget and omitted engine-specific runtimes on library cards. The telemetry system, job detail view, and library cards have now been updated with dedicated separate timers for ElevenLabs and the local model. In addition, the web interface was completely redesigned for both desktop (widescreen 1360px container, frosted sticky navigation bar, comparison KPI scorecards) and mobile (fixed bottom dock, 1-tap quick academic term pills, responsive comparison cards, touch targets, and iOS Safari auto-zoom prevention).
+
+1. **Dedicated Dual-Engine Timers:**
+   - Aggregated telemetry in the database (`db.usage_totals()`) now computes separate audio duration and processing execution runtimes for ElevenLabs and the local model.
+   - The top quota card displays two separate timer widgets: one for ElevenLabs audio and execution runtime, and one for local neural model audio and runtime.
+   - The active job inspection view features a dedicated side-by-side timer dashboard (`<JobTimersDashboard />`) displaying live active states, finished runtimes, and speed multipliers.
+   - Library cards now show dedicated timer badges for ElevenLabs and the local model.
+2. **Desktop & Mobile Responsive UI/UX Overhaul:**
+   - Widescreen 1360px container eliminating cramped margins.
+   - Sticky desktop frosted navbar with live server heartbeat pulse, section quick-jumps, dynamic ElevenLabs credit counter, and theme switcher.
+   - Mobile-first thumb dock pinned to the bottom of the screen on devices under 768px.
+   - 1-tap quick academic keyterm pills (+ KTU, + BTech, + Engineering, etc.) for mobile form input.
+   - Comparison scorecards and mobile cards view for audio segment evaluations.
+
+**Files touched:**
+- `backend/db.py` — updated `usage_totals()` to compute separate engine statistics.
+- `frontend/src/App.jsx` — added `JobTimersDashboard`, split `UsageCard` into two timer widgets, added library timer badges, sticky top navbar, mobile bottom dock, and responsive comparison cards.
+- `frontend/src/App.css` — added responsive grid styles for timers, navigation bars, comparison cards, and touch-target optimizations.
+
+**How to check it:** View the top telemetry card on the website to see two separate timer boxes for ElevenLabs and Local Model. Open any lecture in the library to see the side-by-side execution timers and speed metrics. Resize the window to mobile width to see the floating bottom dock and adaptive comparison cards.
+
+---
+
+## 2026-10-23 — English spelling table approval and model comparison scoring activation [MAJOR]
+
+**What changed:** When evaluating Malayalam ASR against ElevenLabs in dual-transcription jobs, ElevenLabs produces Latin characters for English technical terms (e.g., "two", "row", "class") whereas the local IndicConformer model writes them in Malayalam script (e.g., "ടു", "റോ", "ക്ലാസ്സ്"). Previously, roughly 40% of word disagreements stemmed strictly from differing alphabets rather than audio misrecognition, rendering WER and CER comparison metrics disabled until vocabulary coverage reached 50%.
+
+The spelling table (`data/english_map.json`) was populated and approved, unlocking model agreement scoring across the application:
+1. **Bulk Approval Tooling:** Added `--approve-all` to `build_english_map.py` and a corresponding REST endpoint (`POST /api/english-map/bulk-approve`), allowing batch verification of proposed AI4Bharat IndicXlit transliterations.
+2. **One-Click UI Approval:** Added an "Approve All Proposed" button to the English Spellings tab in `<SpellingTable />` with live progress feedback, letting reviewers approve the dictionary without repetitive manual edits.
+3. **Model Agreement Scoring Activated:** With 144 English words approved representing 99.6% spoken vocabulary coverage (1,509 of 1,515 occurrences), the comparison table now directly displays active WER (36.1%) and CER (11.97%) agreement metrics and segment-by-segment transliterated diffs.
+
+**Files touched:**
+- `backend/build_english_map.py` — added `--approve-all` flag to mark all proposed transliterations as checked.
+- `backend/main.py` — added `POST /api/english-map/bulk-approve` endpoint.
+- `frontend/src/api.js` — added `bulkApproveSpellings()` API client helper.
+- `frontend/src/App.jsx` — added "Approve All Proposed" action button and live feedback alert in `<SpellingTable />`.
+- `tests/api_suite.py` — verified approval persistence and scoring unlocking.
+
+**How to check it:** View any lecture transcribed with the "Both" option (such as job `20261021-034533-6df118`). The previously present warning banner is gone, and the agreement metrics (36.1% WER, 11.97% CER) and segment comparisons are fully rendered. In the "English spellings" tab, approved coverage shows 99.6%.
+
+---
+
+## 2026-10-23 — Audio acoustic health inspector and in-browser segment verification editor [MAJOR]
+
+**What changed:** Training an automatic speech recognition model requires high-quality acoustic data and accurate reference transcripts. Previously, verifying whether a classroom recording had too much background air conditioning hum or microphone distortion required downloading the audio file and inspecting it in external audio software. Furthermore, correcting imperfect automated transcriptions previously required manually editing raw JSON files on the server.
+
+Two major tools have been added to the web interface:
+
+1. **Acoustic Quality & Audio Health Inspector:** When a lecture is transcribed, the system automatically analyzes its acoustic characteristics using pure-Python audio frame measurement. It measures the Signal-to-Noise Ratio (SNR), average speech volume (RMS dBFS), digital ceiling clipping (detecting microphone distortion), and active speech duration ratio. The tool assigns an overall Audio Health Score from 0 to 100 with clear rating badges (Optimal, Good, Fair, Poor) and provides actionable diagnostic tips (e.g., detecting if microphone gain was too low or room noise too loud) before researchers spend time fine-tuning on problematic audio.
+
+2. **In-Browser Audio Player & Human Verification Editor:** Researchers and student reviewers can now listen to each segmented clip directly in their web browser with adjustable playback speeds (0.75x to 1.5x) and optional auto-advance to the next clip. An inline text editor allows the reviewer to tweak the Malayalam transcript, and a single click on "Save & Verify" saves the ground-truth corrections (`transcript_corrected.json`), updates the NeMo training manifest (`manifest.jsonl`), and flags the lecture as human-certified with a green verified badge throughout the library and training hub.
+
+**Files touched:**
+- `backend/audio_health.py` — created pure-Python acoustic analysis module computing SNR, RMS speech levels, noise floor, peak clipping, and health scores.
+- `backend/main.py` — added endpoints for streaming individual clip WAV files (`GET /api/jobs/{id}/segments/{file}`), saving and reverting human corrections (`PUT/DELETE /api/jobs/{id}/transcript/corrections`), and inspecting/re-analyzing acoustic health (`GET/POST /api/jobs/{id}/health`).
+- `frontend/src/api.js` — added client methods for audio streaming URLs, human correction saves/reverts, and health retrieval.
+- `frontend/src/App.jsx` — added `AudioHealthCard` with metric gauges and diagnostic feedback, and `SegmentEditorAndPlayer` with audio playback controls, auto-advance, and inline Malayalam editing.
+- `frontend/src/App.css` — added responsive styles, audio wave animations, rating badges, and card layouts for health diagnostics and clip editing.
+- `tests/api_suite.py` — added automated assertions for acoustic health calculation, re-analysis, and human correction persistence.
+
+**How to check it:** Open any finished lecture in the web interface to view its Acoustic Quality & Audio Health score and metrics. In the transcript section, click play on any segment to hear the clip, edit the Malayalam text, and click "Save & Verify" to observe the verified badge appear.
+
+---
+
+## 2026-10-23 — Training dataset management hub in the web interface [MAJOR]
+
+**What changed:** Building an accurate speech-recognition model for Malayalam lectures (Part 2) requires collecting roughly twenty hours of segmented, verified audio and transcripts from Part 1. Previously, packaging those lectures into training sets required logging into the server and running terminal commands by hand.
+
+The web interface now includes an integrated Training Dataset Management Hub. It provides a real-time progress meter showing total collected speech hours and clip counts against the 20-hour fine-tuning target. Users can configure lecture-level Train/Validation/Test split ratios (defaulting to 80/10/10) directly from the browser, which guarantees that all clips from any single lecture stay in the same split to prevent acoustic leakage during training. With one click, the system packages the audio and NeMo-compatible JSONL manifests into versioned datasets. Researchers can either download the compressed `.tar.gz` archive directly from their browser or copy a pre-formatted GPU server command to pull the dataset straight to the training machine.
+
+**Files touched:**
+- `backend/export_dataset.py` — modularized dataset generation, splitting, and archive creation into reusable functions while maintaining command-line tool support.
+- `backend/main.py` — added REST API endpoints for dataset summaries, packaging requests, metadata retrieval, and streaming archive downloads.
+- `frontend/src/api.js` — added client methods for dataset statistics, export triggers, and archive downloads.
+- `frontend/src/App.jsx` — added the DatasetHub component with real-time statistics, readiness progress bar, split configuration controls, package list, direct download links, and copyable GPU terminal command.
+- `frontend/src/App.css` — added clean modern styling, progress meters, badge indicators, and split ratio controls for the hub.
+
+**How to check it:** Open the web interface, scroll to the "Training Dataset Hub" section, view current hours and readiness toward the target, customize train/validation/test split ratios, package a dataset, and test downloading the `.tar.gz` archive or copying the GPU pull command.
+
+---
+
+## 2026-10-23 — Modernized web interface with upgraded styling and ergonomics [MINOR]
+
+**What changed:** The website was redesigned with a modern visual style, refined colors, and clearer controls. Choices for the transcription engines and job purposes now display as interactive cards with clear explanations of their accuracy and cost, making it easier to pick the right option at a glance. Both the lecture library and the English spelling dictionary now include instant search filtering, and the layout was polished with smooth animations and clearer indicators.
+
+**Files touched:**
+- `frontend/src/App.css` — upgraded the visual design system with smoother lighting, glassmorphic cards, clearer status badges, and refined typography.
+- `frontend/src/App.jsx` — added interactive engine selection cards, search filtering for lectures and spelling words, and crisp icons.
+
+**How to check it:** Open the website to see the upgraded theme, cards, and search filters.
+
+---
+
+## 2026-10-23 — A second, private copy of the tool on another machine [MAJOR]
+
+**What changed:** The tool now also runs on a second computer, kept as a backup and used
+only when asked for. That computer has no address of its own on the public internet — it
+sits behind its internet provider's shared connection — so it is reached instead over a
+private network that links the developer's own devices, and nobody outside that network
+can see it at all. It keeps its own separate list of lectures, so nothing done there can
+appear in or overwrite the real collection on the main server.
+
+Setting it up exposed a genuine pitfall. The machine runs Linux inside Windows, and the
+project was first placed on a Windows drive reached through a translation layer. Ordinary
+files worked, but the job database froze completely: the database keeps one small file
+held open in memory for speed, and that translation layer cannot do so. The whole Linux
+system was therefore moved onto the larger drive in its native form, which fixed the
+freeze and also allowed the settings file holding the passwords to be properly locked,
+something the Windows drive had silently refused to do.
+
+**Files touched:**
+- None in the project. The work was on the second machine: installing the tool, giving it its own settings file, and making it reachable on the private network.
+
+**How to check it:** From a device on the private network, the backup site asks for the
+same password as the main one.
+
+---
+
+## 2026-10-22 — A whole playlist can be added at once, and nothing is collected twice [MAJOR]
+
+**What changed:** Collecting the twenty or so lectures needed to train the model means,
+in practice, taking them from a course playlist on YouTube. Until now a playlist link was
+refused and only links to single videos were accepted, so the twenty links would have had
+to be copied out by hand — the kind of chore that reliably ends with three of them
+missing. Pasting the playlist link now adds every video in it.
+
+The second half of the change matters more than it sounds. The tool now recognises when a
+lecture has already been collected and quietly leaves it out, so a playlist can be pasted
+again later, after the lecturer adds a video, without paying to transcribe everything in
+it a second time. Recognising that needed a little care, because the same lecture can be
+written several different ways — as a short link, as a full link, or as a full link that
+also mentions which playlist it came from — and all of them now resolve to the same
+lecture.
+
+Tested against a real playlist of the course lectures: the link expanded to fourteen
+videos, and the one already collected was correctly left out. A mistyped or private
+playlist now explains itself instead of showing "Internal Server Error", which is what it
+did when first tried.
+
+**Files touched:**
+- `backend/downloader.py` — reads the list of videos in a playlist without downloading anything, and works out which lecture a link refers to.
+- `backend/main.py` — expands playlists when a list is submitted, and skips lectures already collected.
+- `frontend/src/App.jsx` — the "Many links" box now accepts playlists and explains the behaviour.
+- `tests/api_suite.py` — eleven new checks covering playlist recognition, the three ways of writing the same lecture, and the refusal to collect one twice.
+
+**How to check it:** Paste a playlist link into the "Many links" tab. Every video in it is
+queued, except any lecture already in the list below.
+
+---
+
+## 2026-10-22 — The project folder was renamed to match the project [MINOR]
+
+**What changed:** The folder on the developer's PC was still called "Project Phase 1" from
+the first day of work, while the project, the online repository and the website are all
+now called Lecture Forge. The folder was renamed to match, so there is one name for one
+thing. Nothing inside the project depends on where the folder sits: the update script
+works out its own location, and the online repository stores no file paths, so neither
+needed changing.
+
+**Files touched:**
+- `CLAUDE.md` — records the new folder name.
+
+**How to check it:** The project now sits at `F:\Lecture Forge` on the developer's PC.
+
+---
+
+## 2026-10-22 — The settings that keep the site running are now kept with the code [MAJOR]
+
+**What changed:** The website went down for a few minutes today, and the cause is worth
+recording. When the new web gateway was put in front of the site a day earlier, the two
+settings files that make the site work behind it were edited on the server only, and not
+in the copy of the project kept on the developer's PC. The update script copies the PC's
+copy over the server's, so the first update afterwards quietly replaced the working
+settings with the older ones. The site then answered every visitor with an endless
+redirection loop rather than an error, which is harder to recognise than a plain failure.
+
+Both files now live with the rest of the project, so an update puts the right settings on
+the server instead of removing them. The few details that genuinely differ between the
+live site and the test site — the name of the web server container and two internal port
+numbers — are now read from each copy's own settings file, which is never shared or
+copied, so the same project files can run both.
+
+**Files touched:**
+- `caddy/Caddyfile` — the web server no longer handles its own encryption, since the gateway in front of it does; this is what removes the redirection loop.
+- `docker-compose.yml` — the web server no longer claims the machine's main web ports, and joins the shared network the gateway uses to reach it.
+- `.env.example` — documents the three new settings that differ between the live and test copies.
+
+**How to check it:** Running the update script now leaves the site working; before this
+change it took it offline. Both https://forge.rejected.cc and the test site ask for a
+password afterwards, as they should.
+
+---
+
+## 2026-10-22 — Lectures are queued and run one at a time, and can be submitted in bulk [MAJOR]
+
+**What changed:** Preparing to collect around twenty lectures for model training exposed a
+fault that would have appeared the first time several were submitted together. Each
+submission used to begin work immediately, so twenty lectures meant twenty simultaneous
+downloads, twenty audio conversions and twenty calls to the transcription service, all
+inside a container allowed only two gigabytes of memory. That does not merely run slowly;
+the container is shut down for using too much memory and the whole batch is lost.
+
+Lectures now wait in a queue and are worked through one after another. A lecture still
+waiting its turn also survives a restart of the server, instead of being marked failed as
+it would have been before.
+
+A second change makes collecting that many lectures practical: a new "Many links" tab
+accepts a whole list of YouTube links pasted at once, up to fifty, and applies the same
+choices to all of them. Repeated links are ignored. If any line is not a video link the
+whole list is refused rather than partly accepted, because discovering which three of
+twenty links were silently dropped is worse than pasting the list again.
+
+**Files touched:**
+- `backend/main.py` — a single worker that takes one lecture at a time, and the new bulk submission.
+- `backend/db.py` — finds the lecture that has waited longest, and no longer marks waiting lectures as failed when the server restarts.
+- `frontend/src/App.jsx`, `frontend/src/api.js`, `frontend/src/App.css` — the "Many links" tab.
+- `tests/api_suite.py` — ten new checks, including one that watches a batch drain and confirms only one lecture is ever being worked on.
+
+**How to check it:** Paste several links into the "Many links" tab. They appear in the
+list below, one marked as working and the rest waiting their turn.
+
+---
+
 ## 2026-10-21 — The website moved to forge.rejected.cc [MAJOR]
 
 **What changed:** The site now answers at **https://forge.rejected.cc**, matching what the project is now called. Only the setting naming the address had to change; the web server obtained a fresh security certificate for the new name within seconds, so the padlock, the password prompt and all the browser protections work exactly as before. The previous address no longer responds, which is deliberate: serving both would mean maintaining two certificates for one site. Earlier entries below have been updated to name the current address, so that every "how to check it" instruction in this diary still works.

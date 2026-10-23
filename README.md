@@ -140,6 +140,9 @@ it automatically. Template: `.env.example`.
 | `DOMAIN` | Caddy | Public domain to get a certificate for | `forge.rejected.cc` |
 | `BASIC_AUTH_USER` | Caddy | Website login name | `admin` |
 | `BASIC_AUTH_HASH` | Caddy | bcrypt hash of the website password, **in single quotes** | `'$2a$12$...'` |
+| `CADDY_CONTAINER_NAME` | Caddy | Container name the proxy forwards to. **Must match the Proxy Host in Nginx Proxy Manager.** live `forge-caddy`, test `lecscript-caddy` |
+| `CADDY_HOST_PORT` | Caddy | Localhost-only port for curling this stack directly. live `8083`, test `8080` |
+| `BACKEND_HOST_PORT` | backend | Localhost-only port for the API. live `8000`, test `8001` |
 | `ELEVENLABS_API_KEY` | backend | ElevenLabs API key | `sk_...` |
 | `YTDLP_COOKIES` | backend | Optional cookies file for yt-dlp (path inside the container) | `/data/youtube-cookies.txt` |
 | `HF_TOKEN` | GPU scripts | Hugging Face token; the model checkpoint is gated | `hf_...` |
@@ -174,6 +177,41 @@ handled by the VM, so `data\` works without any ownership changes; on Linux the 
 must be owned by uid 1000 (see the deployment steps).
 
 Job data goes to the PC's `data\` folder. `deploy.ps1` never copies it or the `.env` files.
+
+---
+
+## Collecting many lectures
+
+Lectures are **queued and transcribed one at a time**. Submitting twenty at once does not
+start twenty downloads — they wait their turn, so a long collection run cannot exhaust the
+backend container's memory. A lecture still waiting when the server restarts stays queued
+and is picked up again; only a lecture that was mid-transcription is marked failed.
+
+Use the **Many links** tab to paste a list of YouTube links, one per line, up to 50:
+
+- **Paste a playlist link and every video in it is added.** Mix playlists and
+  individual links freely
+- The engine and purpose chosen below the box apply to **every** link in the list
+- Repeated links are ignored, including the same lecture written different ways
+  (`youtu.be/ID`, `watch?v=ID`, `watch?v=ID&list=…`)
+- **Lectures already collected are skipped**, so re-pasting a playlist after it
+  gains a video costs nothing
+- If any line is neither a video nor a playlist link, the whole paste is refused
+  rather than partly accepted
+
+### The one choice that matters for Part 2
+
+Set **Transcribe with** to `ElevenLabs` or `Both`, and **Use this for** to
+`Model training`.
+
+A lecture transcribed with `Local model` can *never* become training data: the local
+model returns plain text with no word timings, so there is no way to cut it into aligned
+clips. `export_dataset.py` only ever exports jobs whose purpose is `training`. Collecting
+hours of audio with the wrong engine selected is the most expensive mistake available
+here, because the only fix is transcribing it all again.
+
+A transcribe-only job made with ElevenLabs or Both **can** be promoted later for free —
+the word timings are already saved.
 
 ---
 

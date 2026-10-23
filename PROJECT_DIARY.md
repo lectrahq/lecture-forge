@@ -3,6 +3,33 @@
 Newest entries first. MAJOR = new feature or change to how the system is built or
 deployed; MINOR = small fix, wording or documentation change.
 
+## 2026-10-23 — Multi-view tabbed navigation & dedicated focused workspaces [MAJOR]
+
+**What changed:** Previously, all five system features (Ingestion form, Active job workspace, Full lecture library, Dataset export hub, and Manglish spelling dictionary) were stacked on a single endless scrolling page. When reviewing long lectures with transcripts spanning thousands of words, users had to endlessly scroll up and down, frequently overshooting sections and losing their place.
+
+We have refactored the frontend into a clean, modern **Multi-View Tabbed Workspace** with URL hash routing:
+1. **Dedicated Tabbed Screens:**
+   - **`Library` (`#library`):** Clean, searchable hub listing all past recordings, segmented training data, duration stats, and filters without any vertical clutter.
+   - **`Transcribe` (`#transcribe`):** Focused ingestion screen with YouTube URL input, local audio/video file dropzone, batch queue, engine selection, and ElevenLabs API quota telemetry.
+   - **`Active Workspace` (`#job/<id>`):** Dedicated workspace for inspecting a selected lecture with audio streaming, 60 FPS karaoke word tracking, acoustic health card, segment editor, and a prominent "Return to Library" navigation button.
+   - **`Datasets` (`#datasets`):** Independent NeMo training dataset export hub with manifest generation and split tools.
+   - **`Dictionary` (`#dictionary`):** Full-width Malayalam-English transliteration approval table with audio auditioning.
+2. **Deep Linking & Browser History:**
+   - Integrated URL hash routing (`#library`, `#transcribe`, `#job/<id>`, `#datasets`, `#dictionary`).
+   - Browser Back and Forward buttons navigate seamlessly between views.
+   - Reloading or sharing a URL preserves the exact active view and selected job.
+3. **Smooth View Transitions & Mobile Dock:**
+   - Top navbar (`StickyNavbar`) dynamically highlights active tabs with glow pills and job count badges.
+   - Mobile navigation dock (`MobileBottomDock`) allows one-tap view switching on touch devices.
+
+**Files touched:**
+- `frontend/src/App.jsx` — refactored `App()`, `StickyNavbar`, and `MobileBottomDock` to use tab state and hash routing.
+- `frontend/src/App.css` — added styling for tabbed views, view headers, navigation badges, and empty workspace state.
+
+**How to check it:** Visit `https://forge.rejected.cc`. Notice that only the active view is displayed at any time. Clicking any lecture in the library immediately opens its dedicated workspace. Clicking "Return to Library" returns to the library without endless scrolling.
+
+---
+
 ## 2026-10-23 — Local IndicConformer true neural acoustic CTC word alignment (ElevenLabs fidelity) [MAJOR]
 
 **What changed:** The previous word-by-word synchronization for the local AI4Bharat IndicConformer model relied on silence-bounded proportional character interpolation. While this kept words roughly bounded inside 15-20s silence chunks, it assumed a uniform speaking rate across all syllables and could not account for internal pauses, hesitation, or rapid speech. As a result, words would highlight while the speaker was silent or lag behind during fast speech, contrasting sharply with ElevenLabs' millisecond-accurate acoustic alignment.

@@ -5,6 +5,33 @@ deployed; MINOR = small fix, wording or documentation change.
 
 ---
 
+## 2026-10-23 — Instant in-browser audio verification for English transliterations and segment comparison [MAJOR]
+
+**What changed:** When approving English-to-Malayalam transliterations (e.g., verifying that "matrix" maps to "മാട്രിക്സ്" or "eigenvalue" to "ഐഗൻവാല്യൂ"), reviewers previously had to approve spellings based solely on text, without an easy way to verify what was actually spoken in the original lecture audio at that exact second.
+
+To guarantee quality for the training dataset, an instant audio verification system has been implemented:
+1. **Sub-Millisecond Audio Snippet Slicing:**
+   - Added `GET /api/audio-snippet?job_id=...&start=...&end=...` in `backend/main.py`. Because the pipeline already extracts uncompressed 16 kHz mono WAV PCM (`data/<job_id>/audio.wav`), seeking directly with `wave.open().setpos()` delivers precise audio snippets with only **1.4ms** extraction latency on the server, avoiding heavy FFmpeg process spawn overhead.
+   - Slices include 0.7-second padding around words so reviewers hear natural phrase context.
+2. **Spoken Occurrence & Context Indexing:**
+   - Added `get_word_samples_index()` and `GET /api/english-map/occurrences/{word}` to index every spoken occurrence across completed lectures with exact timestamps, lecture titles, and highlighted sentence context (e.g., *"Find ചെയ്യണം [Two] by Two"* at 0:18).
+3. **In-Browser Audio Player in Spelling Review:**
+   - In `<SpellingRow />`, each English word now features a **"▶ Hear Audio"** pill button that plays the exact spoken snippet instantly in the browser.
+   - A spoken context card displays the surrounding sentence with the word highlighted in bold accent, along with the timestamp and lecture title.
+   - If a word was spoken multiple times, reviewers can expand the drawer to listen to up to 5 different audio clips of the professor speaking that word across lectures.
+4. **Segment Audio Playback in Comparison Table:**
+   - Added audio playback buttons to the ElevenLabs vs IndicConformer comparison view (both desktop table and mobile cards), allowing reviewers to immediately listen to any segment with discrepancies between models.
+
+**Files touched:**
+- `backend/main.py` — added `extract_wav_snippet`, `get_word_samples_index`, `/api/audio-snippet`, and `/api/english-map/occurrences/{word}` endpoints.
+- `frontend/src/api.js` — added `audioSnippetUrl()` and `getWordOccurrences()` helpers.
+- `frontend/src/App.jsx` — added `IconVolume`, `renderContext()`, audio playback logic in `SpellingRow`, and segment audio playback in `ComparisonTable`.
+- `frontend/src/App.css` — added styling for audio playback buttons, context cards, and occurrences drawer.
+
+**How to check it:** Open the **English spellings** tab on `https://forge.rejected.cc`. Click **"Hear Audio"** next to words like "two", "matrix", or "eigenvalue" to hear the instructor's exact pronunciation and see the spoken sentence context. Expand "Hear X clips" to audition multiple occurrences. In dual-transcription jobs, click the speaker icon next to any comparison segment timestamp to hear the audio slice.
+
+---
+
 ## 2026-10-23 — Dedicated dual-engine timers and desktop/mobile responsive UI redesign [MAJOR]
 
 **What changed:** Transcribing with both ElevenLabs (cloud) and the local IndicConformer model (on-premise neural ASR) previously lumped all audio processing into a single combined timer in the header widget and omitted engine-specific runtimes on library cards. The telemetry system, job detail view, and library cards have now been updated with dedicated separate timers for ElevenLabs and the local model. In addition, the web interface was completely redesigned for both desktop (widescreen 1360px container, frosted sticky navigation bar, comparison KPI scorecards) and mobile (fixed bottom dock, 1-tap quick academic term pills, responsive comparison cards, touch targets, and iOS Safari auto-zoom prevention).

@@ -15,6 +15,7 @@ Everything a job produces is written to data/<job_id>/:
     segments.json      clip start/end/text (for the website)
 """
 
+import io
 import json
 import logging
 import os
@@ -23,11 +24,13 @@ import secrets
 import shutil
 import threading
 import time
+import unicodedata
+import wave
 from contextlib import asynccontextmanager
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel
 
 load_dotenv()  # in Docker the variables already come from backend/.env via docker-compose
@@ -671,6 +674,116 @@ def get_comparison(job_id: str):
     }
 
 
+def extract_wav_snippet(job_id: str, start_sec: float, end_sec: float) -> bytes:
+    """Slice an uncompressed 16 kHz mono WAV file in sub-millisecond time."""
+    get_job_or_404(job_id)
+    wav_path = os.path.join(job_dir(job_id), "audio.wav")
+    if not os.path.isfile(wav_path):
+        raise HTTPException(status_code=404, detail="Audio file not available for this job.")
+
+    start_sec = max(0.0, float(start_sec))
+    end_sec = max(start_sec + 0.05, float(end_sec))
+    if end_sec - start_sec > 30.0:
+        end_sec = start_sec + 30.0
+
+    try:
+        with wave.open(wav_path, "rb") as wf:
+            framerate = wf.getframerate()
+            nchannels = wf.getnchannels()
+            sampwidth = wf.getsampwidth()
+            total_frames = wf.getnframes()
+
+            start_frame = min(total_frames, max(0, int(start_sec * framerate)))
+            end_frame = min(total_frames, max(start_frame, int(end_sec * framerate)))
+            count = max(0, end_frame - start_frame)
+
+            wf.setpos(start_frame)
+            frames = wf.readframes(count)
+
+            buf = io.BytesIO()
+            with wave.open(buf, "wb") as out:
+                out.setnchannels(nchannels)
+                out.setsampwidth(sampwidth)
+                out.setframerate(framerate)
+                out.writeframes(frames)
+            return buf.getvalue()
+    except Exception as e:
+        log.exception("[%s] error extracting wav snippet %.2f-%.2f: %s", job_id, start_sec, end_sec, e)
+        raise HTTPException(status_code=500, detail="Failed extracting audio snippet.")
+
+
+_word_samples_cache = {"indexed_at": 0.0, "data": {}}
+
+
+def get_word_samples_index() -> dict[str, list[dict]]:
+    """Scan completed jobs with transcripts to index where English words were spoken."""
+    now = time.time()
+    if now - _word_samples_cache["indexed_at"] < 60 and _word_samples_cache["data"]:
+        return _word_samples_cache["data"]
+
+    index: dict[str, list[dict]] = {}
+    latin_run = re.compile(r"[A-Za-z]+")
+
+    job_titles = {}
+    jobs = db.list_jobs()
+    for j in jobs:
+        job_titles[j["id"]] = j.get("title") or j["id"]
+
+    for j in jobs:
+        if j.get("status") != "done":
+            continue
+        folder = job_dir(j["id"])
+        p = os.path.join(folder, "transcript.json")
+        wav_path = os.path.join(folder, "audio.wav")
+        if not (os.path.isfile(p) and os.path.isfile(wav_path)):
+            continue
+
+        try:
+            with open(p, encoding="utf-8") as f:
+                transcript = json.load(f)
+        except Exception:
+            continue
+
+        words = transcript.get("words", [])
+        for idx, item in enumerate(words):
+            if item.get("type") != "word":
+                continue
+            text = unicodedata.normalize("NFC", item.get("text") or "")
+            runs = [r.lower() for r in latin_run.findall(text)]
+            for r in runs:
+                if r not in index:
+                    index[r] = []
+                if len(index[r]) < 5:
+                    ctx_start = max(0, idx - 4)
+                    ctx_end = min(len(words), idx + 5)
+                    parts = []
+                    for k in range(ctx_start, ctx_end):
+                        val = words[k].get("text", "")
+                        parts.append(f"[{val}]" if k == idx else val)
+                    context_str = "".join(parts).strip()
+
+                    s = float(item.get("start", 0))
+                    e = float(item.get("end", 0))
+                    snippet_s = max(0.0, round(s - 0.7, 2))
+                    snippet_e = round(e + 0.8, 2)
+
+                    index[r].append({
+                        "job_id": j["id"],
+                        "job_title": job_titles.get(j["id"], j["id"]),
+                        "word_spoken": item.get("text"),
+                        "start": round(s, 2),
+                        "end": round(e, 2),
+                        "snippet_start": snippet_s,
+                        "snippet_end": snippet_e,
+                        "context": context_str,
+                        "audio_url": f"/api/audio-snippet?job_id={j['id']}&start={snippet_s}&end={snippet_e}",
+                    })
+
+    _word_samples_cache["data"] = index
+    _word_samples_cache["indexed_at"] = now
+    return index
+
+
 def read_english_map() -> dict:
     if not os.path.isfile(ENGLISH_MAP_PATH):
         return {"map": {}, "status": {}, "counts": {}, "candidates": {}}
@@ -690,6 +803,7 @@ def get_english_map():
     mapping = data.get("map", {})
     status = data.get("status", {})
     candidates = data.get("candidates", {})
+    samples_index = get_word_samples_index()
 
     words = sorted(set(mapping) | set(counts),
                    key=lambda w: (-counts.get(w, 0), w))
@@ -702,9 +816,35 @@ def get_english_map():
         # model was inconsistent, which is a reason to look closely.
         "alternatives": candidates.get(word, {}),
         "source": data.get("source", {}).get(word),
+        "sample": (samples_index.get(word) or [None])[0],
+        "samples_count": len(samples_index.get(word) or []),
     } for word in words]
 
     return {"entries": entries, "coverage": map_coverage(ENGLISH_MAP_PATH, counts)}
+
+
+@app.get("/api/english-map/occurrences/{word}")
+def get_word_occurrences(word: str):
+    """Return all sample audio occurrences of a spoken English word across finished lectures."""
+    word = word.strip().lower()
+    samples_index = get_word_samples_index()
+    occurrences = samples_index.get(word, [])
+    return {"word": word, "occurrences": occurrences}
+
+
+@app.get("/api/audio-snippet")
+def get_audio_snippet(job_id: str, start: float = 0.0, end: float = 5.0):
+    """Stream a short slice of the lecture WAV file for hearing exact word pronunciation."""
+    content = extract_wav_snippet(job_id, start, end)
+    return Response(
+        content=content,
+        media_type="audio/wav",
+        headers={
+            "Content-Length": str(len(content)),
+            "Accept-Ranges": "bytes",
+            "Cache-Control": "public, max-age=3600",
+        },
+    )
 
 
 class SpellingUpdate(BaseModel):

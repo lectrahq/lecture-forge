@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import {
+  audioSnippetUrl,
   audioUrl,
   createBatchJobs,
   createYoutubeJob,
@@ -12,6 +13,7 @@ import {
   getJob,
   getTranscript,
   getUsage,
+  getWordOccurrences,
   listJobs,
   promoteJob,
   reanalyzeAudioHealth,
@@ -332,6 +334,15 @@ function IconX() {
     <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
       <line x1="18" y1="6" x2="6" y2="18" />
       <line x1="6" y1="6" x2="18" y2="18" />
+    </svg>
+  );
+}
+
+function IconVolume() {
+  return (
+    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+      <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07" />
     </svg>
   );
 }
@@ -1802,7 +1813,7 @@ function TranscriptView({ transcript, comparison, job, onUpdated }) {
         />
       )}
 
-      {comparison && <ComparisonTable comparison={comparison} />}
+      {comparison && <ComparisonTable comparison={comparison} jobId={job.id} />}
 
       {transcript.segments.length > 0 && (
         <SegmentEditorAndPlayer
@@ -1815,10 +1826,45 @@ function TranscriptView({ transcript, comparison, job, onUpdated }) {
   );
 }
 
-function ComparisonTable({ comparison }) {
+function ComparisonTable({ comparison, jobId }) {
   const { overall, comparable, segments } = comparison;
   const [filter, setFilter] = useState("all");
   const [search, setSearch] = useState("");
+  const audioRef = useRef(null);
+  const [playingSnippet, setPlayingSnippet] = useState(null);
+
+  useEffect(() => {
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
+    };
+  }, []);
+
+  const playSegment = useCallback((start, end) => {
+    if (!jobId) return;
+    const key = `${start}-${end}`;
+    if (audioRef.current) {
+      audioRef.current.pause();
+      if (playingSnippet === key) {
+        audioRef.current = null;
+        setPlayingSnippet(null);
+        return;
+      }
+    }
+    const url = audioSnippetUrl(jobId, start, end);
+    const audio = new Audio(url);
+    audioRef.current = audio;
+    setPlayingSnippet(key);
+    audio.onended = () => {
+      if (audioRef.current === audio) setPlayingSnippet(null);
+    };
+    audio.onerror = () => {
+      if (audioRef.current === audio) setPlayingSnippet(null);
+    };
+    audio.play().catch(() => setPlayingSnippet(null));
+  }, [jobId, playingSnippet]);
 
   const stats = useMemo(() => {
     let matched = 0;
@@ -1947,7 +1993,19 @@ function ComparisonTable({ comparison }) {
             {filtered.map((s) => (
               <tr key={s.origIdx}>
                 <td className="num">{s.origIdx + 1}</td>
-                <td className="time">{formatPrecise(s.start)} – {formatPrecise(s.end)}</td>
+                <td className="time">
+                  {formatPrecise(s.start)} – {formatPrecise(s.end)}
+                  {jobId && (
+                    <button
+                      type="button"
+                      className={`compare-audio-btn ${playingSnippet === `${s.start}-${s.end}` ? "playing" : ""}`}
+                      onClick={() => playSegment(s.start, s.end)}
+                      title="Play segment audio"
+                    >
+                      <IconVolume />
+                    </button>
+                  )}
+                </td>
                 <td>{s.elevenlabs}</td>
                 <td className="ml">{s.local || <em className="muted">(nothing)</em>}</td>
                 {comparable && (
@@ -1974,7 +2032,19 @@ function ComparisonTable({ comparison }) {
         {filtered.map((s) => (
           <div key={s.origIdx} className="compare-card-item">
             <div className="compare-card-meta">
-              <span>#{s.origIdx + 1} · {formatPrecise(s.start)} – {formatPrecise(s.end)}</span>
+              <span>
+                #{s.origIdx + 1} · {formatPrecise(s.start)} – {formatPrecise(s.end)}
+                {jobId && (
+                  <button
+                    type="button"
+                    className={`compare-audio-btn ${playingSnippet === `${s.start}-${s.end}` ? "playing" : ""}`}
+                    onClick={() => playSegment(s.start, s.end)}
+                    title="Play segment audio"
+                  >
+                    <IconVolume />
+                  </button>
+                )}
+              </span>
               {comparable && s.scores.wer != null && (
                 <span className={s.scores.wer === 0 ? "badge done" : "badge"}>
                   {s.scores.wer === 0 ? "✓ 100% Match" : `${(s.scores.wer * 100).toFixed(0)}% Discrepancy`}
@@ -2400,10 +2470,79 @@ function SpellingTable() {
   );
 }
 
+function renderContext(ctx) {
+  if (!ctx) return null;
+  const parts = ctx.split(/(\[[^\]]+\])/g);
+  return parts.map((part, i) => {
+    if (part.startsWith("[") && part.endsWith("]")) {
+      return <strong key={i}>{part.slice(1, -1)}</strong>;
+    }
+    return <span key={i}>{part}</span>;
+  });
+}
+
 function SpellingRow({ entry, draft, busy, error, onDraft, onSave }) {
   const value = draft ?? entry.spelling;
   const approved = entry.status === "checked";
   const changed = draft != null && draft !== entry.spelling;
+
+  const audioRef = useRef(null);
+  const [playingUrl, setPlayingUrl] = useState(null);
+  const [showOccurrences, setShowOccurrences] = useState(false);
+  const [occurrences, setOccurrences] = useState(null);
+  const [loadingOcc, setLoadingOcc] = useState(false);
+
+  useEffect(() => {
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
+    };
+  }, []);
+
+  const playAudio = useCallback((url) => {
+    if (!url) return;
+    if (audioRef.current) {
+      audioRef.current.pause();
+      if (playingUrl === url) {
+        audioRef.current = null;
+        setPlayingUrl(null);
+        return;
+      }
+    }
+    const audio = new Audio(url);
+    audioRef.current = audio;
+    setPlayingUrl(url);
+    audio.onended = () => {
+      if (audioRef.current === audio) {
+        setPlayingUrl(null);
+      }
+    };
+    audio.onerror = () => {
+      if (audioRef.current === audio) {
+        setPlayingUrl(null);
+      }
+    };
+    audio.play().catch(() => {
+      setPlayingUrl(null);
+    });
+  }, [playingUrl]);
+
+  const toggleOccurrences = useCallback(() => {
+    if (!showOccurrences && occurrences == null) {
+      setLoadingOcc(true);
+      getWordOccurrences(entry.word)
+        .then((data) => {
+          setOccurrences(data.occurrences || []);
+          setLoadingOcc(false);
+        })
+        .catch(() => {
+          setLoadingOcc(false);
+        });
+    }
+    setShowOccurrences((prev) => !prev);
+  }, [showOccurrences, occurrences, entry.word]);
 
   const everyAlternative = Object.entries(entry.alternatives || {})
     .filter(([spelling]) => spelling !== value)
@@ -2414,7 +2553,20 @@ function SpellingRow({ entry, draft, busy, error, onDraft, onSave }) {
   return (
     <li className={approved ? "spelling approved" : "spelling"}>
       <div className="spelling-word">
-        <strong>{entry.word}</strong>
+        <div className="spelling-word-top">
+          <strong>{entry.word}</strong>
+          {entry.sample && (
+            <button
+              type="button"
+              className={`sample-audio-btn ${playingUrl === entry.sample.audio_url ? "playing" : ""}`}
+              onClick={() => playAudio(entry.sample.audio_url)}
+              title={`Hear "${entry.word}" spoken in lecture audio`}
+            >
+              <IconVolume />
+              <span>{playingUrl === entry.sample.audio_url ? "Playing…" : "Hear Audio"}</span>
+            </button>
+          )}
+        </div>
         <span className="muted small">Spoken {entry.occurrences}×</span>
       </div>
 
@@ -2447,6 +2599,52 @@ function SpellingRow({ entry, draft, busy, error, onDraft, onSave }) {
           </button>
         )}
       </div>
+
+      {entry.sample && (
+        <div className="spelling-context-card">
+          <span className="context-tag">Spoken context:</span>
+          <span className="context-quote">"{renderContext(entry.sample.context)}"</span>
+          <span className="context-time">
+            at {formatTime(entry.sample.start)} ({entry.sample.job_title})
+          </span>
+          {entry.samples_count > 1 && (
+            <button
+              type="button"
+              className="sample-more-toggle"
+              onClick={toggleOccurrences}
+            >
+              {showOccurrences ? "Hide other clips" : `Hear ${entry.samples_count} clips ▾`}
+            </button>
+          )}
+        </div>
+      )}
+
+      {showOccurrences && (
+        <div className="occurrences-drawer">
+          {loadingOcc && <span className="small muted">Loading audio clips…</span>}
+          {occurrences && occurrences.length === 0 && (
+            <span className="small muted">No additional clips found.</span>
+          )}
+          {occurrences && occurrences.map((occ, i) => (
+            <div key={i} className="occ-item">
+              <button
+                type="button"
+                className={`occ-play-btn ${playingUrl === occ.audio_url ? "playing" : ""}`}
+                onClick={() => playAudio(occ.audio_url)}
+                title="Play audio clip"
+              >
+                <IconVolume />
+              </button>
+              <div className="occ-body">
+                <span className="occ-quote">"{renderContext(occ.context)}"</span>
+                <span className="occ-meta">
+                  {occ.job_title} · {formatTime(occ.start)}
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       {alternatives.length > 0 && (
         <p className="spelling-alts small muted">

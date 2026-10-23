@@ -88,6 +88,13 @@ export const bulkApproveSpellings = (words) =>
     body: JSON.stringify({ words: words || null }),
   });
 
+// Audio snippets & occurrence verification for English words
+export const audioSnippetUrl = (jobId, start, end) =>
+  `/api/audio-snippet?job_id=${encodeURIComponent(jobId)}&start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`;
+
+export const getWordOccurrences = (word) =>
+  request(`/api/english-map/occurrences/${encodeURIComponent(word)}`);
+
 // Dataset Export (Part 2 Bridge)
 export const getDatasetSummary = () => request("/api/dataset/summary");
 export const exportDataset = (options) =>

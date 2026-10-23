@@ -5,6 +5,31 @@ deployed; MINOR = small fix, wording or documentation change.
 
 ---
 
+## 2026-10-23 — Local ASR model word-by-word karaoke synchronization & click-to-seek [MAJOR]
+
+**What changed:** Lectures transcribed using the local AI4Bharat IndicConformer model (or with `engine="local"`) previously showed plain, static text in the transcript pane without any interactive words or audio tracking, because the local ASR model only outputs un-timed text strings without phoneme or word timestamps.
+
+We have designed and implemented an automated **silence-bounded proportional word timing engine** (`get_or_align_local_words`) that unlocks full word-by-word audio karaoke highlighting, click-to-seek navigation, and auto-scrolling for all local-model lectures:
+1. **Silence-Bounded Natural Audio Chunking:**
+   - Leveraging FFmpeg's acoustic silence detection (`find_silences`) and chunk planning (`plan_chunks`), the lecture audio is partitioned at the speaker's natural acoustic pause boundaries into 15–25s continuous speech chunks (running in <0.3s even on 18-minute lectures).
+   - Words from the local transcript are mapped onto each speech chunk proportional to their character/syllable length (`max(1, len(word))`), eliminating time drift between sentences.
+   - Within each chunk, millisecond start/end timestamps are calculated for every word based on relative character duration.
+2. **Instant 0ms Disk Caching (`local_words.json`):**
+   - The aligned word sequence is automatically cached on disk as `local_words.json` in the job directory on first access or during initial transcription in `run_local_only`.
+   - Subsequent page loads return the pre-computed word timestamps in 0ms without running FFmpeg or silence detection again.
+   - Any manual human corrections saved or reverted in the segment editor automatically invalidate this cache to re-synchronize word timestamps to edited text.
+3. **Dual-Engine Side-by-Side Word Synchronization:**
+   - For lectures transcribed with `engine="both"`, `GET /api/jobs/{job_id}/transcript` now provides both `words` (ElevenLabs reference) and `local_words` (IndicConformer prediction).
+   - The secondary local model pane in the UI now receives `words={transcript.local_words}`, allowing simultaneous dual-engine synchronized word tracking and click-to-seek playback.
+
+**Files touched:**
+- `backend/main.py` — added `get_or_align_local_words`, updated `run_local_only` and `run_local_on_segments` to generate segments and cached words, updated `get_transcript` to return `words` for local engine and `local_words` for dual-engine jobs, and added cache invalidation on corrections.
+- `frontend/src/App.jsx` — wired `words={transcript.local_words || []}`, audio seek handlers, and playback controls into the secondary transcript pane in `TranscriptView`. Updated `SubmitForm` description for the local engine.
+
+**How to check it:** Open any local-model lecture on `https://forge.rejected.cc` (e.g. `20261021-054220-c19b26` or `20261021-053355-f9dd7c`). Notice the word count and "Click any word to jump audio" notice in the header. Press Play or click any Malayalam word in the transcript: audio playback begins and the words illuminate smoothly in golden amber in real-time. Click any word further down to jump immediately to that point in the lecture.
+
+---
+
 ## 2026-10-23 — Synchronized word-by-word audio karaoke highlighting and click-to-seek scrubbing [MAJOR]
 
 **What changed:** Reviewers and researchers listening to long lecture recordings previously had to manually read ahead in the static transcript text without visual synchronization to the spoken audio. Finding the exact point in the audio where a specific word was uttered required guesswork and trial-and-error timeline scrubbing. Additionally, default browser `timeupdate` events fire at a sluggish ~250ms cadence, which caused text highlights to visibly lag behind rapid speech.

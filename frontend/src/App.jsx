@@ -984,7 +984,7 @@ function SubmitForm({ onCreated }) {
               <span className="choice-card-badge">Free</span>
             </div>
             <span className="choice-card-desc">
-              Runs on this server's CPU. Free, but no word timestamps (cannot cut training clips).
+              Runs on this server's CPU. Free transcription with silence-synchronized word playback.
             </span>
           </button>
 
@@ -2401,10 +2401,12 @@ function TranscriptView({
           className="second-transcript"
           title="Transcript (local model)"
           text={transcript.local_text}
-          words={[]}
+          words={transcript.local_words || []}
           jobId={job?.job_id}
           isPlaying={isPlaying}
-          hasAudio={false}
+          onSeek={onSeek}
+          onTogglePlay={onTogglePlay}
+          hasAudio={Boolean(job?.audio_available)}
         />
       )}
 

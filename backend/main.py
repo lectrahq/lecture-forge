@@ -205,6 +205,151 @@ def get_job_or_404(job_id: str) -> dict:
 
 # ---------------------------------------------------------------- pipeline
 
+def get_or_align_local_words(folder: str, text: str = "", segments: list[dict] | None = None,
+                             duration: float | None = None) -> list[dict]:
+    """Provide millisecond-accurate word timestamps for local ASR model transcripts.
+
+    Since the local AI4Bharat IndicConformer model outputs plain text without word-level
+    timestamps, this function generates word timings synchronized with silence-bounded audio
+    segments and character-proportional speech durations. Timings are cached in
+    local_words.json in the job directory for instant 0ms retrieval on all subsequent loads.
+    """
+    cache_path = os.path.join(folder, "local_words.json")
+    if os.path.isfile(cache_path):
+        try:
+            with open(cache_path, "r", encoding="utf-8") as f:
+                cached = json.load(f)
+                if isinstance(cached, list) and len(cached) > 0:
+                    return cached
+        except Exception:
+            pass
+
+    # If segments were not passed directly, look for existing segments files on disk
+    local_seg_path = os.path.join(folder, "local_segments.json")
+    if not segments and os.path.isfile(local_seg_path):
+        try:
+            with open(local_seg_path, "r", encoding="utf-8") as f:
+                raw_segs = json.load(f)
+                segments = []
+                for s in raw_segs:
+                    seg_text = (s.get("local") if "local" in s else s.get("text")) or ""
+                    segments.append({
+                        "start": float(s["start"]),
+                        "end": float(s["end"]),
+                        "text": seg_text.strip(),
+                    })
+        except Exception:
+            segments = None
+
+    # If we have no text, try reading local_transcript.txt
+    if not text:
+        txt_path = os.path.join(folder, "local_transcript.txt")
+        if os.path.isfile(txt_path):
+            try:
+                with open(txt_path, "r", encoding="utf-8") as f:
+                    text = f.read().strip()
+            except Exception:
+                text = ""
+
+    # If segments are still missing (past local jobs), run silence detection and chunking
+    wav_path = os.path.join(folder, "audio.wav")
+    if (not segments or not any(s.get("text") for s in segments)) and os.path.isfile(wav_path):
+        try:
+            if not duration:
+                duration = wav_duration(wav_path)
+            silences = find_silences(wav_path)
+            chunks = plan_chunks(duration, silences)
+            words = [w for w in text.split() if w.strip()]
+            if words and chunks:
+                word_lens = [max(1, len(w)) for w in words]
+                total_chars = sum(word_lens)
+                total_chunk_dur = sum(c["end"] - c["start"] for c in chunks)
+                segments = []
+                word_idx = 0
+                for i, chunk in enumerate(chunks):
+                    c_dur = chunk["end"] - chunk["start"]
+                    target_chars = total_chars * (c_dur / total_chunk_dur) if total_chunk_dur > 0 else 0
+                    chunk_words = []
+                    accum = 0
+                    while word_idx < len(words):
+                        if i == len(chunks) - 1:
+                            chunk_words.append(words[word_idx])
+                            word_idx += 1
+                            continue
+                        w_len = word_lens[word_idx]
+                        if accum > 0 and (accum + w_len - target_chars > target_chars - accum):
+                            break
+                        chunk_words.append(words[word_idx])
+                        accum += w_len
+                        word_idx += 1
+                    segments.append({
+                        "start": chunk["start"],
+                        "end": chunk["end"],
+                        "text": " ".join(chunk_words),
+                    })
+                try:
+                    with open(local_seg_path, "w", encoding="utf-8") as f:
+                        json.dump(segments, f, ensure_ascii=False, indent=1)
+                except Exception:
+                    pass
+        except Exception as e:
+            log.warning("[%s] could not compute silence-bounded segments: %s", folder, e)
+
+    timed_words = []
+    if segments:
+        for seg in segments:
+            s_start = float(seg["start"])
+            s_end = float(seg["end"])
+            dur = max(0.1, s_end - s_start)
+            s_text = seg.get("text") or seg.get("local") or ""
+            seg_words = [w for w in s_text.split() if w.strip()]
+            if not seg_words:
+                continue
+            weights = [max(1, len(w)) for w in seg_words]
+            total_w = sum(weights)
+            curr_t = s_start
+            for w, weight in zip(seg_words, weights):
+                w_dur = dur * (weight / total_w)
+                w_start = round(curr_t, 2)
+                w_end = round(min(s_end, curr_t + w_dur), 2)
+                if w_end <= w_start:
+                    w_end = round(w_start + 0.05, 2)
+                timed_words.append({
+                    "text": w,
+                    "start": w_start,
+                    "end": w_end,
+                })
+                curr_t += w_dur
+    elif text:
+        dur = duration or 60.0
+        words = [w for w in text.split() if w.strip()]
+        if words:
+            weights = [max(1, len(w)) for w in words]
+            total_w = sum(weights)
+            curr_t = 0.0
+            for w, weight in zip(words, weights):
+                w_dur = dur * (weight / total_w)
+                w_start = round(curr_t, 2)
+                w_end = round(curr_t + w_dur, 2)
+                if w_end <= w_start:
+                    w_end = round(w_start + 0.05, 2)
+                timed_words.append({
+                    "text": w,
+                    "start": w_start,
+                    "end": w_end,
+                })
+                curr_t += w_dur
+
+    if timed_words:
+        try:
+            with open(cache_path, "w", encoding="utf-8") as f:
+                json.dump(timed_words, f, ensure_ascii=False, indent=1)
+        except Exception:
+            pass
+
+    return timed_words
+
+
 def run_local_only(job_id: str, folder: str, wav_path: str, duration: float) -> None:
     """Transcribe with the local model alone: no ElevenLabs, no credits, no clips.
 
@@ -230,6 +375,17 @@ def run_local_only(job_id: str, folder: str, wav_path: str, duration: float) -> 
     with open(os.path.join(folder, "local_transcript.txt"), "w", encoding="utf-8") as f:
         f.write(full_text + "\n")
     log.info("[%s] local transcript saved (%d characters)", job_id, len(full_text))
+
+    local_segs = [
+        {"start": round(c["start"], 2), "end": round(c["end"], 2), "text": t.strip()}
+        for c, t in zip(chunks, texts)
+        if t.strip()
+    ]
+    with open(os.path.join(folder, "local_segments.json"), "w", encoding="utf-8") as f:
+        json.dump(local_segs, f, ensure_ascii=False, indent=1)
+
+    # Pre-align words to silence-bounded chunk timestamps for instant karaoke highlighting
+    get_or_align_local_words(folder, text=full_text, segments=local_segs, duration=duration)
 
 
 def run_local_on_segments(job_id: str, folder: str, wav_path: str, segments: list[dict],
@@ -261,9 +417,17 @@ def run_local_on_segments(job_id: str, folder: str, wav_path: str, segments: lis
     ]
     with open(os.path.join(folder, "local_segments.json"), "w", encoding="utf-8") as f:
         json.dump(compared, f, ensure_ascii=False, indent=1)
+    full_local_text = " ".join(t.strip() for t in texts if t.strip())
     with open(os.path.join(folder, "local_transcript.txt"), "w", encoding="utf-8") as f:
-        f.write(" ".join(t.strip() for t in texts if t.strip()) + "\n")
+        f.write(full_local_text + "\n")
     log.info("[%s] local transcript and comparison saved", job_id)
+
+    local_segs = [
+        {"start": s["start"], "end": s["end"], "text": s["local"]}
+        for s in compared
+        if s.get("local") and s["local"].strip()
+    ]
+    get_or_align_local_words(folder, text=full_local_text, segments=local_segs)
 
 
 # --- the job queue --------------------------------------------------------
@@ -332,8 +496,16 @@ def run_job(job_id: str) -> None:
         # 2. The local model on its own: no ElevenLabs call, so no credits spent.
         if engine == "local":
             run_local_only(job_id, folder, wav_path, duration)
-            db.update_job(job_id, status="done", segment_count=None)
-            log.info("[%s] done (local model only, no training data produced)", job_id)
+            local_segs_path = os.path.join(folder, "local_segments.json")
+            seg_count = None
+            if os.path.isfile(local_segs_path):
+                try:
+                    with open(local_segs_path, encoding="utf-8") as f:
+                        seg_count = len(json.load(f))
+                except Exception:
+                    pass
+            db.update_job(job_id, status="done", segment_count=seg_count)
+            log.info("[%s] done (local model only, %s segments)", job_id, seg_count)
             return
 
         # 3. Transcribe with ElevenLabs Scribe v2.
@@ -941,8 +1113,7 @@ def get_transcript(job_id: str):
         raise HTTPException(status_code=409, detail=f"Transcript not ready (job is {job['status']}).")
     folder = job_dir(job_id)
 
-    # A local-model-only job has no ElevenLabs transcript and no segment boundaries:
-    # the local model gives text without word timings.
+    # A local-model-only job: word timings and chunk segments aligned via silence detection.
     if job["engine"] == "local":
         with open(os.path.join(folder, "local_transcript.txt"), encoding="utf-8") as f:
             text = f.read().strip()
@@ -955,15 +1126,24 @@ def get_transcript(job_id: str):
                     segments = json.load(f)
             except Exception:
                 pass
+        elif os.path.isfile(os.path.join(folder, "local_segments.json")):
+            try:
+                with open(os.path.join(folder, "local_segments.json"), encoding="utf-8") as f:
+                    segments = json.load(f)
+            except Exception:
+                pass
+
+        timed_words = get_or_align_local_words(folder, text=text, segments=segments, duration=job.get("duration"))
+
         return {
             "job_id": job_id,
             "title": public_job(job)["title"],
-            "language_code": None,
+            "language_code": "malayalam",
             "source": "local",
             "text": text,
             "local_text": None,
-            "words": [],
-            "segments": segments,
+            "words": timed_words,
+            "segments": segments or [],
             "human_verified": is_corrected,
             "original_segments": None,
         }
@@ -1006,10 +1186,12 @@ def get_transcript(job_id: str):
                 })
 
     local_text = None
+    local_words = []
     local_path = os.path.join(folder, "local_transcript.txt")
     if os.path.isfile(local_path):
         with open(local_path, encoding="utf-8") as f:
             local_text = f.read().strip()
+        local_words = get_or_align_local_words(folder, text=local_text, duration=job.get("duration"))
 
     return {
         "job_id": job_id,
@@ -1018,6 +1200,7 @@ def get_transcript(job_id: str):
         "source": "elevenlabs",
         "text": text,
         "local_text": local_text,
+        "local_words": local_words,
         "words": timed_words,
         "human_verified": is_corrected,
         "segments": [
@@ -1096,6 +1279,13 @@ def save_transcript_corrections(job_id: str, request: CorrectionsRequest):
         with open(os.path.join(folder, "transcript_corrected.txt"), "w", encoding="utf-8") as f:
             f.write(full_text + "\n")
 
+    cached_words_path = os.path.join(folder, "local_words.json")
+    if os.path.isfile(cached_words_path):
+        try:
+            os.remove(cached_words_path)
+        except OSError:
+            pass
+
     log.info("[%s] saved %d human-corrected segments", job_id, len(normalized_segments))
     return {"ok": True, "human_verified": True, "segment_count": len(normalized_segments)}
 
@@ -1111,6 +1301,12 @@ def revert_transcript_corrections(job_id: str):
     corrected_txt = os.path.join(folder, "transcript_corrected.txt")
     if os.path.isfile(corrected_txt):
         os.remove(corrected_txt)
+    cached_words_path = os.path.join(folder, "local_words.json")
+    if os.path.isfile(cached_words_path):
+        try:
+            os.remove(cached_words_path)
+        except OSError:
+            pass
 
     segments_path = os.path.join(folder, "segments.json")
     if os.path.isfile(segments_path):

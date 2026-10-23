@@ -221,7 +221,15 @@ def get_or_align_local_words(folder: str, text: str = "", segments: list[dict] |
             with open(cache_path, "r", encoding="utf-8") as f:
                 cached = json.load(f)
                 if isinstance(cached, list) and len(cached) > 0:
-                    return cached
+                    # In real speech only ~6% of words touch back-to-back. If >85% touch,
+                    # it is an old artificial proportional interpolation file. Discard it.
+                    sample_size = min(50, len(cached) - 1)
+                    if sample_size > 5 and os.path.isfile(os.path.join(folder, "audio.wav")):
+                        touching = sum(1 for i in range(sample_size) if cached[i].get("end") == cached[i + 1].get("start"))
+                        if touching / sample_size > 0.85:
+                            cached = None
+                    if cached:
+                        return cached
         except Exception:
             pass
 

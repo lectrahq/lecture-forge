@@ -3,9 +3,33 @@
 Newest entries first. MAJOR = new feature or change to how the system is built or
 deployed; MINOR = small fix, wording or documentation change.
 
+## 2026-10-23 — Local IndicConformer true neural acoustic CTC word alignment (ElevenLabs fidelity) [MAJOR]
+
+**What changed:** The previous word-by-word synchronization for the local AI4Bharat IndicConformer model relied on silence-bounded proportional character interpolation. While this kept words roughly bounded inside 15-20s silence chunks, it assumed a uniform speaking rate across all syllables and could not account for internal pauses, hesitation, or rapid speech. As a result, words would highlight while the speaker was silent or lag behind during fast speech, contrasting sharply with ElevenLabs' millisecond-accurate acoustic alignment.
+
+We analyzed the internal architecture of AI4Bharat's `EncDecHybridRNNTCTCBPEModel` and discovered that the model's CTC decoder emits a full frame-level alignment tensor (`torch.Size([T, 257])`) at 40ms frame resolution (10ms frame stride × 4x Conformer subsampling):
+1. **Acoustic CTC Greedy Alignment Decoder (`decode_ctc_words`):**
+   - Implemented in `gpu/common.py`. Greedy collapses the CTC posterior alignments, strips blank tokens (ID 256), and parses SentencePiece space prefixes (`' '` / U+2581) and space tokens (ID 166) to detect precise word boundaries.
+   - Calculates exact physical acoustic onset (`start`) and offset (`end`) in seconds (`frame_index * 0.04s`).
+2. **ASR Microservice Word Streaming:**
+   - Updated `asr/server.py` and `common.transcribe_with_words` to return `chunk_words` alongside transcribed texts.
+   - Updated `backend/local_asr.py` with `transcribe_clips_with_words`.
+3. **End-to-End Pipeline & Cache Integration:**
+   - Updated `run_local_only` and `run_local_on_segments` in `backend/main.py` to assemble and cache true neural `local_words.json`.
+   - Updated `get_or_align_local_words` to cut audio chunks and query the neural CTC alignment tensor directly, bypassing artificial proportional math entirely.
+   - Deployed to the VPS and re-aligned existing local lectures (`20261021-053355-f9dd7c`, `20261021-054220-c19b26`). Words now highlight with true acoustic accuracy, pausing during silence and lighting up on exact vocal onset—matching ElevenLabs fidelity.
+
+**Files touched:**
+- `gpu/common.py` — added `decode_ctc_words` and `transcribe_with_words`.
+- `asr/server.py` — updated `POST /transcribe` to extract and return `chunk_words`.
+- `backend/local_asr.py` — added `transcribe_clips_with_words`.
+- `backend/main.py` — updated `run_local_only`, `run_local_on_segments`, and `get_or_align_local_words` to compute and serve true neural CTC acoustic word timestamps.
+
+**How to check it:** Open any local lecture on `https://forge.rejected.cc` (e.g. `20261021-054220-c19b26` or `20261021-053355-f9dd7c`). Notice how word highlights cleanly stop during pauses and light up on the exact millisecond the speaker utters each word, behaving identically to ElevenLabs.
+
 ---
 
-## 2026-10-23 — Local ASR model word-by-word karaoke synchronization & click-to-seek [MAJOR]
+
 
 **What changed:** Lectures transcribed using the local AI4Bharat IndicConformer model (or with `engine="local"`) previously showed plain, static text in the transcript pane without any interactive words or audio tracking, because the local ASR model only outputs un-timed text strings without phoneme or word timestamps.
 

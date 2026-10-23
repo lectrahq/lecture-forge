@@ -1273,7 +1273,7 @@ input[type="url"]:focus, input[type="text"]:focus {
   padding: 1px 4px;
   margin: 0 1px;
   color: var(--text);
-  transition: background 0.12s ease, color 0.12s ease, transform 0.12s ease, box-shadow 0.12s ease;
+  transition: background 0.06s ease, color 0.06s ease;
   user-select: text;
 }
 
@@ -1294,8 +1294,7 @@ input[type="url"]:focus, input[type="text"]:focus {
   color: #0f172a !important;
   font-weight: 700;
   border-radius: 4px;
-  box-shadow: 0 0 12px rgba(245, 158, 11, 0.6), 0 2px 4px rgba(0, 0, 0, 0.15);
-  transform: scale(1.06);
+  box-shadow: 0 0 10px rgba(245, 158, 11, 0.55);
   position: relative;
   z-index: 2;
   text-decoration: none;

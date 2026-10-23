@@ -69,6 +69,9 @@ export const promoteJob = (id) =>
 // Plain link target: the browser downloads the WAV itself (no need to load it into JS).
 export const audioUrl = (id) => `/api/jobs/${encodeURIComponent(id)}/audio`;
 
+// Stream URL for HTML5 in-browser audio playback with Range headers
+export const streamAudioUrl = (id) => `/api/jobs/${encodeURIComponent(id)}/stream-audio`;
+
 // The English-to-Malayalam spelling table, commonest words first.
 export const getEnglishMap = () => request("/api/english-map");
 

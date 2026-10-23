@@ -5,6 +5,31 @@ deployed; MINOR = small fix, wording or documentation change.
 
 ---
 
+## 2026-10-23 — Full in-browser lecture audio player with seeking and library previews [MAJOR]
+
+**What changed:** Previously, listening to a lecture's complete recording required downloading the entire multi-megabyte WAV file to the local computer. Reviewers could only audition short 5–15 second cut training clips inside the segment editor.
+
+A comprehensive in-browser audio player has now been added:
+1. **HTTP Range Audio Streaming Backend:**
+   - Updated `GET /api/jobs/{job_id}/audio` in `backend/main.py` to support `inline=true` with `Content-Disposition: inline` and added `GET /api/jobs/{job_id}/stream-audio`.
+   - Enabled standard HTTP Range requests (HTTP 206 Partial Content), allowing instant scrub and seek across large WAV files (100MB+) with low memory overhead.
+2. **Interactive Full Audio Player Component:**
+   - Added `<FullAudioPlayer />` in `frontend/src/App.jsx`.
+   - Features a prominent Play/Pause toggle with live pulse status badge, interactive scrubber timeline with gradient progress fill, elapsed time and total duration counters (`02:15 / 14:32`), `-10s` and `+10s` quick-skip buttons, playback speed controls (`1×`, `1.25×`, `1.5×`, `2×`), and mute/volume slider.
+   - Preserves direct WAV download button for researchers.
+3. **Quick Listen in Library:**
+   - In `<JobList />`, each lecture card with available audio now features a 1-tap **"▶ Listen"** badge, letting reviewers audition the full recording directly from the library list without opening the job.
+
+**Files touched:**
+- `backend/main.py` — added `inline` parameter to `get_audio()` and added `/api/jobs/{job_id}/stream-audio` endpoint.
+- `frontend/src/api.js` — exported `streamAudioUrl()`.
+- `frontend/src/App.jsx` — added `IconVolumeMute`, `IconRewind10`, `IconForward10`, `<FullAudioPlayer />`, and library card quick-listen button.
+- `frontend/src/App.css` — added responsive player bar styles, timeline scrubber styling, and speed/volume controls.
+
+**How to check it:** Open any lecture with audio on `https://forge.rejected.cc`. A sleek audio player widget appears directly under the title. Click Play to start listening, drag the timeline to jump to any point in the recording, or change speed to 1.25×/1.5×. In the library list, click "Listen" on any card to audition audio immediately.
+
+---
+
 ## 2026-10-23 — Instant in-browser audio verification for English transliterations and segment comparison [MAJOR]
 
 **What changed:** When approving English-to-Malayalam transliterations (e.g., verifying that "matrix" maps to "മാട്രിക്സ്" or "eigenvalue" to "ഐഗൻവാല്യൂ"), reviewers previously had to approve spellings based solely on text, without an easy way to verify what was actually spoken in the original lecture audio at that exact second.

@@ -909,14 +909,29 @@ def bulk_approve_spellings(request: BulkApproveRequest | None = None):
 
 
 @app.get("/api/jobs/{job_id}/audio")
-def get_audio(job_id: str):
-    """Download the extracted 16 kHz mono WAV (streamed from disk, not loaded into memory)."""
+def get_audio(job_id: str, inline: bool = False):
+    """Stream or download the extracted 16 kHz mono WAV."""
     job = get_job_or_404(job_id)
     path = os.path.join(job_dir(job_id), "audio.wav")
     if not os.path.isfile(path):
         raise HTTPException(status_code=404, detail="Audio is not available for this job.")
+    if inline:
+        return FileResponse(
+            path,
+            media_type="audio/wav",
+            headers={
+                "Accept-Ranges": "bytes",
+                "Content-Disposition": "inline",
+            },
+        )
     return FileResponse(path, media_type="audio/wav",
                         filename=download_name(public_job(job)["title"], job_id))
+
+
+@app.get("/api/jobs/{job_id}/stream-audio")
+def stream_audio(job_id: str):
+    """Stream the full 16 kHz mono WAV for in-browser HTML5 playback with Range seeking support."""
+    return get_audio(job_id, inline=True)
 
 
 @app.get("/api/jobs/{job_id}/transcript")

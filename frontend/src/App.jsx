@@ -22,6 +22,7 @@ import {
   segmentAudioUrl,
   setEnglishSpelling,
   bulkApproveSpellings,
+  streamAudioUrl,
   uploadFile,
 } from "./api.js";
 import { THEMES, applyTheme, loadTheme, saveTheme } from "./theme.js";
@@ -343,6 +344,34 @@ function IconVolume() {
     <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
       <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07" />
+    </svg>
+  );
+}
+
+function IconVolumeMute() {
+  return (
+    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+      <line x1="23" y1="9" x2="17" y2="15" />
+      <line x1="17" y1="9" x2="23" y2="15" />
+    </svg>
+  );
+}
+
+function IconRewind10() {
+  return (
+    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M11 17l-5-5 5-5" />
+      <path d="M18 17l-5-5 5-5" />
+    </svg>
+  );
+}
+
+function IconForward10() {
+  return (
+    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M13 17l5-5-5-5" />
+      <path d="M6 17l5-5-5-5" />
     </svg>
   );
 }
@@ -1022,6 +1051,245 @@ function SubmitForm({ onCreated }) {
   );
 }
 
+// --- Full In-Browser Lecture Audio Player ---
+function FullAudioPlayer({ job }) {
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(job.duration || 0);
+  const [playbackSpeed, setPlaybackSpeed] = useState(1);
+  const [volume, setVolume] = useState(1);
+  const [isMuted, setIsMuted] = useState(false);
+  const [isSeeking, setIsSeeking] = useState(false);
+  const [seekValue, setSeekValue] = useState(0);
+  const audioRef = useRef(null);
+
+  const streamSrc = streamAudioUrl(job.job_id);
+
+  useEffect(() => {
+    if (job.duration && !duration) {
+      setDuration(job.duration);
+    }
+  }, [job.duration, duration]);
+
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+
+    const onTimeUpdate = () => {
+      if (!isSeeking) {
+        setCurrentTime(audio.currentTime);
+      }
+    };
+    const onLoadedMetadata = () => {
+      if (audio.duration && !isNaN(audio.duration) && audio.duration !== Infinity) {
+        setDuration(audio.duration);
+      }
+    };
+    const onEnded = () => {
+      setIsPlaying(false);
+      setCurrentTime(0);
+    };
+    const onPlay = () => setIsPlaying(true);
+    const onPause = () => setIsPlaying(false);
+
+    audio.addEventListener("timeupdate", onTimeUpdate);
+    audio.addEventListener("loadedmetadata", onLoadedMetadata);
+    audio.addEventListener("ended", onEnded);
+    audio.addEventListener("play", onPlay);
+    audio.addEventListener("pause", onPause);
+
+    return () => {
+      audio.removeEventListener("timeupdate", onTimeUpdate);
+      audio.removeEventListener("loadedmetadata", onLoadedMetadata);
+      audio.removeEventListener("ended", onEnded);
+      audio.removeEventListener("play", onPlay);
+      audio.removeEventListener("pause", onPause);
+    };
+  }, [isSeeking]);
+
+  function togglePlay() {
+    const audio = audioRef.current;
+    if (!audio) return;
+    if (isPlaying) {
+      audio.pause();
+    } else {
+      audio.play().catch(() => {});
+    }
+  }
+
+  function skip(seconds) {
+    const audio = audioRef.current;
+    if (!audio) return;
+    const target = Math.max(0, Math.min(duration || 99999, audio.currentTime + seconds));
+    audio.currentTime = target;
+    setCurrentTime(target);
+  }
+
+  function handleSeekStart(e) {
+    setIsSeeking(true);
+    setSeekValue(parseFloat(e.target.value));
+  }
+
+  function handleSeekChange(e) {
+    setSeekValue(parseFloat(e.target.value));
+  }
+
+  function handleSeekEnd(e) {
+    const target = parseFloat(e.target.value);
+    setIsSeeking(false);
+    setCurrentTime(target);
+    if (audioRef.current) {
+      audioRef.current.currentTime = target;
+    }
+  }
+
+  function changeSpeed(speed) {
+    setPlaybackSpeed(speed);
+    if (audioRef.current) {
+      audioRef.current.playbackRate = speed;
+    }
+  }
+
+  function toggleMute() {
+    if (audioRef.current) {
+      audioRef.current.muted = !isMuted;
+      setIsMuted(!isMuted);
+    }
+  }
+
+  function handleVolumeChange(e) {
+    const v = parseFloat(e.target.value);
+    setVolume(v);
+    setIsMuted(v === 0);
+    if (audioRef.current) {
+      audioRef.current.volume = v;
+      audioRef.current.muted = v === 0;
+    }
+  }
+
+  const effectiveCurrent = isSeeking ? seekValue : currentTime;
+  const progressPercent = duration > 0 ? Math.min(100, (effectiveCurrent / duration) * 100) : 0;
+
+  return (
+    <div className={`full-audio-player ${isPlaying ? "playing" : ""}`}>
+      <audio
+        ref={audioRef}
+        src={streamSrc}
+        preload="metadata"
+      />
+
+      <div className="player-top-row">
+        <div className="player-status-badge">
+          <span className={`pulse-indicator ${isPlaying ? "active" : ""}`} />
+          <strong>Full Lecture Audio (WAV, 16 kHz Mono)</strong>
+          {duration > 0 && <span className="muted small">· {formatTime(duration)}</span>}
+        </div>
+        <div className="player-top-actions">
+          <a href={audioUrl(job.job_id)} download className="player-download-btn" title="Download uncompressed WAV">
+            <IconDownload /> Download WAV
+          </a>
+        </div>
+      </div>
+
+      <div className="player-main-controls">
+        <button
+          type="button"
+          className="player-skip-btn"
+          onClick={() => skip(-10)}
+          title="Rewind 10 seconds"
+          aria-label="Rewind 10 seconds"
+        >
+          <IconRewind10 />
+          <span>-10s</span>
+        </button>
+
+        <button
+          type="button"
+          className={`player-big-play-btn ${isPlaying ? "playing" : ""}`}
+          onClick={togglePlay}
+          title={isPlaying ? "Pause audio" : "Play full lecture audio"}
+          aria-label={isPlaying ? "Pause audio" : "Play full lecture audio"}
+        >
+          {isPlaying ? <IconPause /> : <IconPlay />}
+        </button>
+
+        <button
+          type="button"
+          className="player-skip-btn"
+          onClick={() => skip(10)}
+          title="Fast-forward 10 seconds"
+          aria-label="Fast-forward 10 seconds"
+        >
+          <span>+10s</span>
+          <IconForward10 />
+        </button>
+
+        {/* Time Scrubber */}
+        <div className="player-timeline-wrap">
+          <span className="player-time-label elapsed">{formatTime(effectiveCurrent)}</span>
+          <div className="player-scrubber-track">
+            <input
+              type="range"
+              className="player-scrubber"
+              min="0"
+              max={duration || 100}
+              step="0.1"
+              value={effectiveCurrent}
+              onMouseDown={handleSeekStart}
+              onTouchStart={handleSeekStart}
+              onChange={handleSeekChange}
+              onMouseUp={handleSeekEnd}
+              onTouchEnd={handleSeekEnd}
+              style={{
+                background: `linear-gradient(to right, var(--accent) ${progressPercent}%, var(--border-firm) ${progressPercent}%)`
+              }}
+              aria-label="Seek time"
+            />
+          </div>
+          <span className="player-time-label total">{formatTime(duration)}</span>
+        </div>
+
+        {/* Speed Controls */}
+        <div className="player-speed-pills" role="radiogroup" aria-label="Playback speed">
+          {[1, 1.25, 1.5, 2].map((s) => (
+            <button
+              key={s}
+              type="button"
+              className={`player-speed-btn ${playbackSpeed === s ? "active" : ""}`}
+              onClick={() => changeSpeed(s)}
+            >
+              {s}×
+            </button>
+          ))}
+        </div>
+
+        {/* Volume Controls */}
+        <div className="player-volume-wrap">
+          <button
+            type="button"
+            className="player-mute-btn"
+            onClick={toggleMute}
+            title={isMuted ? "Unmute" : "Mute"}
+            aria-label={isMuted ? "Unmute" : "Mute"}
+          >
+            {isMuted || volume === 0 ? <IconVolumeMute /> : <IconVolume />}
+          </button>
+          <input
+            type="range"
+            className="player-volume-slider"
+            min="0"
+            max="1"
+            step="0.05"
+            value={isMuted ? 0 : volume}
+            onChange={handleVolumeChange}
+            aria-label="Volume"
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // --- Active Job Status & Inspector ---
 function JobStatus({ job, onPromoted }) {
   const stages = stagesFor(job);
@@ -1101,18 +1369,15 @@ function JobStatus({ job, onPromoted }) {
         </div>
       )}
 
-      {(job.source_url || job.audio_available) && (
-        <div className="job-links">
-          {job.source_url && (
-            <a href={job.source_url} target="_blank" rel="noopener noreferrer" className="source-link">
-              <IconYoutube /> Open on YouTube ↗
-            </a>
-          )}
-          {job.audio_available && (
-            <a href={audioUrl(job.job_id)} download className="button">
-              <IconDownload /> Download audio (WAV, 16 kHz mono)
-            </a>
-          )}
+      {job.audio_available && (
+        <FullAudioPlayer job={job} />
+      )}
+
+      {job.source_url && (
+        <div className="job-links" style={{ marginTop: job.audio_available ? 0 : undefined }}>
+          <a href={job.source_url} target="_blank" rel="noopener noreferrer" className="source-link">
+            <IconYoutube /> Open on YouTube ↗
+          </a>
         </div>
       )}
 
@@ -2188,6 +2453,39 @@ function JobLists({ jobs, currentId, onOpen, onRefresh }) {
 }
 
 function JobList({ jobs, currentId, onOpen, empty }) {
+  const [playingJobAudioId, setPlayingJobAudioId] = useState(null);
+  const audioRef = useRef(null);
+
+  useEffect(() => {
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
+    };
+  }, []);
+
+  function toggleJobAudio(j) {
+    if (playingJobAudioId === j.job_id) {
+      if (audioRef.current) audioRef.current.pause();
+      setPlayingJobAudioId(null);
+      return;
+    }
+    if (audioRef.current) {
+      audioRef.current.pause();
+    }
+    const audio = new Audio(streamAudioUrl(j.job_id));
+    audioRef.current = audio;
+    setPlayingJobAudioId(j.job_id);
+    audio.onended = () => {
+      if (audioRef.current === audio) setPlayingJobAudioId(null);
+    };
+    audio.onerror = () => {
+      if (audioRef.current === audio) setPlayingJobAudioId(null);
+    };
+    audio.play().catch(() => setPlayingJobAudioId(null));
+  }
+
   if (jobs.length === 0) {
     return <p className="empty">{empty}</p>;
   }
@@ -2217,6 +2515,22 @@ function JobList({ jobs, currentId, onOpen, empty }) {
                   {j.audio_health && (
                     <span className={`badge health-${j.audio_health.rating.toLowerCase()}`}>
                       {j.audio_health.score}/100 {j.audio_health.rating}
+                    </span>
+                  )}
+                  {j.audio_available && (
+                    <span
+                      role="button"
+                      tabIndex={0}
+                      className={`badge ${playingJobAudioId === j.job_id ? "done" : ""}`}
+                      style={{ cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 4 }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleJobAudio(j);
+                      }}
+                      title={playingJobAudioId === j.job_id ? "Pause audio" : "Play full lecture audio"}
+                    >
+                      {playingJobAudioId === j.job_id ? <IconPause /> : <IconPlay />}
+                      {playingJobAudioId === j.job_id ? "Playing Audio" : "Listen"}
                     </span>
                   )}
                   <span className={`badge ${j.status}`}>{STAGE_LABELS[j.status] || j.status}</span>

@@ -8,6 +8,7 @@ a choice rather than a replacement.
 
 import logging
 import os
+import time
 
 import httpx
 
@@ -58,28 +59,40 @@ def transcribe_clips_with_words(paths: list[str], decoder: str = "ctc",
     """Transcribe a list of WAV files, returning both text and exact acoustic word timestamps per clip."""
     if not paths:
         return [], []
-    try:
-        response = httpx.post(
-            f"{ASR_URL}/transcribe",
-            json={"paths": paths, "decoder": decoder, "batch_size": batch_size,
-                  "progress_path": progress_path},
-            timeout=TIMEOUT_SECONDS,
-        )
-    except httpx.HTTPError as e:
-        raise LocalAsrError(
-            "Could not reach the local speech recognition service. "
-            f"Is the 'asr' container running? ({type(e).__name__})"
-        ) from None
 
-    if response.status_code != 200:
-        detail = ""
+    max_retries = 120  # retry for up to 10 minutes if ASR is busy with another job
+    response = None
+    for attempt in range(max_retries):
         try:
-            detail = response.json().get("detail", "")
-        except ValueError:
-            detail = response.text[:300]
+            response = httpx.post(
+                f"{ASR_URL}/transcribe",
+                json={"paths": paths, "decoder": decoder, "batch_size": batch_size,
+                      "progress_path": progress_path},
+                timeout=TIMEOUT_SECONDS,
+            )
+        except httpx.HTTPError as e:
+            raise LocalAsrError(
+                "Could not reach the local speech recognition service. "
+                f"Is the 'asr' container running? ({type(e).__name__})"
+            ) from None
+
         if response.status_code == 409:
-            raise LocalAsrError("The local model is busy with another job. Please try again shortly.")
-        raise LocalAsrError(f"Local speech recognition failed ({response.status_code}): {detail}")
+            log.info("local ASR service busy (409), waiting 5s (attempt %d/%d)...", attempt + 1, max_retries)
+            time.sleep(5)
+            continue
+        break
+
+    if response is None or response.status_code != 200:
+        detail = ""
+        if response is not None:
+            try:
+                detail = response.json().get("detail", "")
+            except ValueError:
+                detail = response.text[:300]
+            status = response.status_code
+        else:
+            status = "timeout"
+        raise LocalAsrError(f"Local speech recognition failed ({status}): {detail}")
 
     data = response.json()
     texts = data.get("texts", [])

@@ -9,18 +9,18 @@ deployed; MINOR = small fix, wording or documentation change.
 
 We have refactored the frontend into a clean, modern **Multi-View Tabbed Workspace** with URL hash routing:
 1. **Dedicated Tabbed Screens:**
+   - **`Transcribe` (`#transcribe`):** Primary landing view on launch. Focused ingestion screen with YouTube URL input, local audio/video file dropzone, batch queue, engine selection, and ElevenLabs API quota telemetry. Positioned first in the top navigation bar and mobile dock.
    - **`Library` (`#library`):** Clean, searchable hub listing all past recordings, segmented training data, duration stats, and filters without any vertical clutter.
-   - **`Transcribe` (`#transcribe`):** Focused ingestion screen with YouTube URL input, local audio/video file dropzone, batch queue, engine selection, and ElevenLabs API quota telemetry.
    - **`Active Workspace` (`#job/<id>`):** Dedicated workspace for inspecting a selected lecture with audio streaming, 60 FPS karaoke word tracking, acoustic health card, segment editor, and a prominent "Return to Library" navigation button.
    - **`Datasets` (`#datasets`):** Independent NeMo training dataset export hub with manifest generation and split tools.
    - **`Dictionary` (`#dictionary`):** Full-width Malayalam-English transliteration approval table with audio auditioning.
 2. **Deep Linking & Browser History:**
-   - Integrated URL hash routing (`#library`, `#transcribe`, `#job/<id>`, `#datasets`, `#dictionary`).
+   - Integrated URL hash routing (`#transcribe` [default], `#library`, `#job/<id>`, `#datasets`, `#dictionary`).
    - Browser Back and Forward buttons navigate seamlessly between views.
-   - Reloading or sharing a URL preserves the exact active view and selected job.
+   - Opening the root URL without a hash immediately displays the `Transcribe` view. Reloading or sharing a deep link preserves the exact active view and selected job.
 3. **Smooth View Transitions & Mobile Dock:**
-   - Top navbar (`StickyNavbar`) dynamically highlights active tabs with glow pills and job count badges.
-   - Mobile navigation dock (`MobileBottomDock`) allows one-tap view switching on touch devices.
+   - Top navbar (`StickyNavbar`) dynamically highlights active tabs with glow pills and job count badges, placing `Transcribe` first followed by `Library`.
+   - Mobile navigation dock (`MobileBottomDock`) places `New` (`Transcribe`) first for fast one-tap ingestion.
 
 **Files touched:**
 - `frontend/src/App.jsx` — refactored `App()`, `StickyNavbar`, and `MobileBottomDock` to use tab state and hash routing.

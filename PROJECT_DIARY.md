@@ -3,6 +3,29 @@
 Newest entries first. MAJOR = new feature or change to how the system is built or
 deployed; MINOR = small fix, wording or documentation change.
 
+## 2026-10-24 — Mobile browser viewport overflow & layout fix [MAJOR]
+
+**What changed:** On mobile browsers (iPhone Safari, Android Chrome, etc.), the page exhibited horizontal scrolling, causing the layout to appear zoomed-out or off-center, with the right edge cut off.
+
+1. **Root Cause Analysis:**
+   - In `StickyNavbar`, the brand and right actions container (`nav-right` with quota badge and a 3-button "System / Light / Dark" theme switcher) required 436px of horizontal space.
+   - On standard mobile viewports (360px - 412px wide), this generated 24px - 76px of horizontal overflow, triggering horizontal swaying and misaligned dock calculations.
+2. **Fixes Applied:**
+   - **Responsive Theme Switcher:** Upgraded `ThemeSwitch` with clean inline SVG icons (`IconMonitor`, `IconSun`, `IconMoon`). On screens <= 600px, text labels collapse into a sleek 80px icon pill while keeping full touch target size.
+   - **Compact Quota Badge:** On mobile devices, `nav-quota-pill` switches from `123k credits` to `123k`, preventing navbar crowding.
+   - **Horizontal Overflow Guard:** Enforced `overflow-x: hidden` and `max-width: 100vw` on `html` and `body`.
+   - **Viewport Fit & Safe Area Insets:** Added `viewport-fit=cover` to `<meta name="viewport">` in `index.html` and updated mobile bottom dock spacing to `calc(76px + env(safe-area-inset-bottom, 0px))`, preventing notch or home indicator cutoffs on iOS devices.
+   - **Scroll Repaint Fix:** Changed `background-attachment: fixed` to `scroll` on mobile devices (`<= 768px`) to prevent iOS Safari repaint lag.
+3. **Verification:**
+   - Tested in Playwright across 360px, 375px, 390px, and 412px viewports across all 5 tabbed routes (`#transcribe`, `#library`, `#datasets`, `#dictionary`, `#job/...`). All routes now measure **0px overflow**.
+
+**Files touched:**
+- `frontend/index.html` — added `viewport-fit=cover`.
+- `frontend/src/App.jsx` — added theme icons (`IconMonitor`, `IconSun`, `IconMoon`) and responsive quota/theme markup.
+- `frontend/src/App.css` — added mobile navbar rules, icon pill styles, and safe-area padding.
+
+---
+
 ## 2026-10-23 — Multi-view tabbed navigation & dedicated focused workspaces [MAJOR]
 
 **What changed:** Previously, all five system features (Ingestion form, Active job workspace, Full lecture library, Dataset export hub, and Manglish spelling dictionary) were stacked on a single endless scrolling page. When reviewing long lectures with transcripts spanning thousands of words, users had to endlessly scroll up and down, frequently overshooting sections and losing their place.

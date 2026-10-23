@@ -376,6 +376,33 @@ function IconForward10() {
   );
 }
 
+function IconSun() {
+  return (
+    <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="12" cy="12" r="4" />
+      <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41" />
+    </svg>
+  );
+}
+
+function IconMoon() {
+  return (
+    <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z" />
+    </svg>
+  );
+}
+
+function IconMonitor() {
+  return (
+    <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect width="18" height="12" x="3" y="4" rx="2" />
+      <line x1="8" x2="16" y1="20" y2="20" />
+      <line x1="12" x2="12" y1="16" y2="20" />
+    </svg>
+  );
+}
+
 // --- Navigation Components ---
 function StickyNavbar({ activeTab, onSelectTab, jobsCount, currentId, usage }) {
   const creditsLeft = usage?.elevenlabs?.credits_left;
@@ -436,7 +463,8 @@ function StickyNavbar({ activeTab, onSelectTab, jobsCount, currentId, usage }) {
           {creditsLeft != null && (
             <div className="nav-quota-pill" title={`${creditsLeft.toLocaleString()} ElevenLabs credits remaining`}>
               <span className="dot" />
-              <span>{Math.round(creditsLeft / 1000)}k credits</span>
+              <span className="nav-quota-full">{Math.round(creditsLeft / 1000)}k credits</span>
+              <span className="nav-quota-compact">{Math.round(creditsLeft / 1000)}k</span>
             </div>
           )}
           <ThemeSwitch />
@@ -858,7 +886,11 @@ function UsageCard({ usage }) {
 }
 
 // --- Theme Switcher ---
-const THEME_LABELS = { system: "System", light: "Light", dark: "Dark" };
+const THEME_OPTIONS = [
+  { id: "system", label: "Auto", icon: <IconMonitor /> },
+  { id: "light", label: "Light", icon: <IconSun /> },
+  { id: "dark", label: "Dark", icon: <IconMoon /> },
+];
 
 function ThemeSwitch() {
   const [theme, setTheme] = useState(loadTheme);
@@ -871,15 +903,17 @@ function ThemeSwitch() {
 
   return (
     <div className="theme-switch" role="group" aria-label="Colour theme">
-      {THEMES.map((t) => (
+      {THEME_OPTIONS.map(({ id, label, icon }) => (
         <button
-          key={t}
+          key={id}
           type="button"
-          aria-pressed={theme === t}
-          className={theme === t ? "active" : ""}
-          onClick={() => choose(t)}
+          aria-pressed={theme === id}
+          className={theme === id ? "active" : ""}
+          onClick={() => choose(id)}
+          title={`${label} theme`}
         >
-          {THEME_LABELS[t]}
+          {icon}
+          <span className="theme-switch-label">{label}</span>
         </button>
       ))}
     </div>

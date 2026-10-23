@@ -46,13 +46,18 @@ DEFAULT_BATCH_SIZE = 2
 def transcribe_clips(paths: list[str], decoder: str = "ctc",
                      batch_size: int = DEFAULT_BATCH_SIZE,
                      progress_path: str | None = None) -> list[str]:
-    """Transcribe a list of WAV files, returning one piece of text per file.
+    """Transcribe a list of WAV files, returning one piece of text per file."""
+    texts, _ = transcribe_clips_with_words(paths, decoder=decoder, batch_size=batch_size,
+                                           progress_path=progress_path)
+    return texts
 
-    Paths are as the containers see them (/data/...); the asr service shares the
-    same data folder, so the same path works on both sides.
-    """
+
+def transcribe_clips_with_words(paths: list[str], decoder: str = "ctc",
+                                batch_size: int = DEFAULT_BATCH_SIZE,
+                                progress_path: str | None = None) -> tuple[list[str], list[list[dict]]]:
+    """Transcribe a list of WAV files, returning both text and exact acoustic word timestamps per clip."""
     if not paths:
-        return []
+        return [], []
     try:
         response = httpx.post(
             f"{ASR_URL}/transcribe",
@@ -78,9 +83,10 @@ def transcribe_clips(paths: list[str], decoder: str = "ctc",
 
     data = response.json()
     texts = data.get("texts", [])
+    chunk_words = data.get("chunk_words", [[] for _ in texts])
     if len(texts) != len(paths):
         raise LocalAsrError(
             f"The local model returned {len(texts)} results for {len(paths)} clips."
         )
     log.info("local model transcribed %d clips in %ss", len(texts), data.get("seconds_taken"))
-    return texts
+    return texts, chunk_words

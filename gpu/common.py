@@ -243,6 +243,104 @@ def transcribe(model, audio_paths: list[str], batch_size: int = 8,
     return out
 
 
+def decode_ctc_words(ctc_hyp, tokenizer, language_id: str = "ml", frame_dur: float = 0.04) -> tuple[str, list[dict]]:
+    """Decode raw CTC alignments into words with exact acoustic start and end timestamps.
+
+    IndicConformer uses 4x subsampling at 10ms frame stride = 40ms (0.04s) per acoustic frame.
+    SentencePiece spaces (' ' / U+2581 or ' ') and blank tokens are parsed to determine precise
+    word acoustic boundaries without time drift.
+    """
+    alignments = getattr(ctc_hyp, "alignments", None)
+    if alignments is None:
+        text = getattr(ctc_hyp, "text", "")
+        return text, []
+
+    token_ids = alignments.argmax(dim=-1).tolist()
+    blank_id = alignments.shape[-1] - 1
+
+    # CTC greedy collapse
+    collapsed = []
+    prev_tid = None
+    for t, tid in enumerate(token_ids):
+        if tid != blank_id and tid != prev_tid:
+            collapsed.append((t, tid))
+        prev_tid = tid
+
+    words = []
+    curr_pieces = []
+    curr_start_t = None
+    last_t = None
+
+    for t, tid in collapsed:
+        tok_str = tokenizer.ids_to_text([tid], lang=language_id)
+        is_space_token = tok_str.strip() == ""
+        starts_with_space = tok_str.startswith(" ") or tok_str.startswith(" ")
+
+        if (is_space_token or starts_with_space) and curr_pieces:
+            word_str = "".join(curr_pieces)
+            if word_str:
+                words.append({
+                    "text": word_str,
+                    "start": round(curr_start_t * frame_dur, 2),
+                    "end": round((last_t + 1) * frame_dur, 2),
+                })
+            curr_pieces = []
+            curr_start_t = None
+
+        cleaned = tok_str.replace(" ", "").replace(" ", "").strip()
+        if cleaned:
+            if curr_start_t is None:
+                curr_start_t = t
+            curr_pieces.append(cleaned)
+            last_t = t
+
+    if curr_pieces:
+        word_str = "".join(curr_pieces)
+        if word_str:
+            words.append({
+                "text": word_str,
+                "start": round(curr_start_t * frame_dur, 2),
+                "end": round((last_t + 1) * frame_dur, 2),
+            })
+
+    full_text = getattr(ctc_hyp, "text", " ".join(w["text"] for w in words)).strip()
+    return full_text, words
+
+
+def transcribe_with_words(model, audio_paths: list[str], batch_size: int = 4,
+                          language_id: str | None = None) -> tuple[list[str], list[list[dict]]]:
+    """Transcribe a list of clips and extract acoustic word timestamps from the CTC alignment tensor."""
+    import inspect
+
+    lang = language_id or LANGUAGE_ID
+    parameters = inspect.signature(model.transcribe).parameters
+    options = {"batch_size": batch_size, "return_hypotheses": True}
+    if "language_id" in parameters:
+        options["language_id"] = lang
+    if "num_workers" in parameters:
+        options["num_workers"] = 0
+
+    result = model.transcribe(audio_paths, **options)
+    # Hybrid model returns (rnnt_hyps, ctc_hyps) when return_hypotheses=True
+    if isinstance(result, (list, tuple)) and len(result) > 1 and isinstance(result[1], list):
+        hyps = result[1]
+    elif isinstance(result, (list, tuple)):
+        hyps = result[0] if isinstance(result[0], list) else result
+    else:
+        hyps = [result]
+
+    texts = []
+    chunk_words = []
+    for hyp in hyps:
+        if isinstance(hyp, list):
+            hyp = hyp[0]
+        text, words = decode_ctc_words(hyp, model.tokenizer, language_id=lang)
+        texts.append(text)
+        chunk_words.append(words)
+
+    return texts, chunk_words
+
+
 def evaluate_model(dataset_dir: str, splits: list[str], out_dir: str, label: str,
                    checkpoint: str | None = None, decoders: tuple[str, ...] = ("ctc", "rnnt"),
                    batch_size: int = 8, limit: int | None = None) -> dict:

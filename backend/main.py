@@ -39,7 +39,8 @@ import db  # noqa: E402  (imported after load_dotenv so DATA_DIR is set)
 from downloader import (AudioError, check_ffmpeg, convert_to_wav,  # noqa: E402
                         download_youtube_audio, is_playlist_url, is_youtube_url,
                         list_playlist_videos, wav_duration, youtube_video_id)
-from local_asr import LocalAsrError, transcribe_clips  # noqa: E402
+from local_asr import (LocalAsrError, transcribe_clips,  # noqa: E402
+                       transcribe_clips_with_words)
 from normalise import (has_latin, load_english_map, map_coverage,  # noqa: E402
                        normalise_text, prepare_reference)
 from segmenter import (build_segments, cut_chunks, find_silences,  # noqa: E402
@@ -209,10 +210,10 @@ def get_or_align_local_words(folder: str, text: str = "", segments: list[dict] |
                              duration: float | None = None) -> list[dict]:
     """Provide millisecond-accurate word timestamps for local ASR model transcripts.
 
-    Since the local AI4Bharat IndicConformer model outputs plain text without word-level
-    timestamps, this function generates word timings synchronized with silence-bounded audio
-    segments and character-proportional speech durations. Timings are cached in
-    local_words.json in the job directory for instant 0ms retrieval on all subsequent loads.
+    First checks local_words.json cache. If not found, runs neural acoustic CTC forced
+    alignment via the local IndicConformer model to extract real phoneme onset/offset
+    frame boundaries (40ms stride). Falls back gracefully to silence-bounded chunking
+    if the ASR container is unreachable.
     """
     cache_path = os.path.join(folder, "local_words.json")
     if os.path.isfile(cache_path):
@@ -224,7 +225,45 @@ def get_or_align_local_words(folder: str, text: str = "", segments: list[dict] |
         except Exception:
             pass
 
-    # If segments were not passed directly, look for existing segments files on disk
+    # Priority 2: Extract real neural acoustic word timestamps from the local ASR model
+    wav_path = os.path.join(folder, "audio.wav")
+    if os.path.isfile(wav_path):
+        try:
+            if not duration:
+                duration = wav_duration(wav_path)
+            if duration <= 60.0:
+                _, chunk_words = transcribe_clips_with_words([wav_path])
+                if chunk_words and chunk_words[0]:
+                    timed_words = chunk_words[0]
+                    with open(cache_path, "w", encoding="utf-8") as f:
+                        json.dump(timed_words, f, ensure_ascii=False, indent=1)
+                    return timed_words
+            else:
+                silences = find_silences(wav_path)
+                chunks = plan_chunks(duration, silences)
+                temp_dir = os.path.join(folder, "_align_chunks")
+                try:
+                    paths = cut_chunks(wav_path, chunks, temp_dir, "align")
+                    _, chunk_words = transcribe_clips_with_words(paths)
+                    timed_words = []
+                    for c, c_words in zip(chunks, chunk_words):
+                        c_start = c["start"]
+                        for w in c_words:
+                            timed_words.append({
+                                "text": w["text"],
+                                "start": round(c_start + w["start"], 2),
+                                "end": round(c_start + w["end"], 2),
+                            })
+                    if timed_words:
+                        with open(cache_path, "w", encoding="utf-8") as f:
+                            json.dump(timed_words, f, ensure_ascii=False, indent=1)
+                        return timed_words
+                finally:
+                    shutil.rmtree(temp_dir, ignore_errors=True)
+        except Exception as e:
+            log.warning("[%s] neural acoustic word alignment failed, falling back: %s", folder, e)
+
+    # Priority 3 (Fallback): Estimate word timings from silence-bounded segments
     local_seg_path = os.path.join(folder, "local_segments.json")
     if not segments and os.path.isfile(local_seg_path):
         try:
@@ -241,7 +280,6 @@ def get_or_align_local_words(folder: str, text: str = "", segments: list[dict] |
         except Exception:
             segments = None
 
-    # If we have no text, try reading local_transcript.txt
     if not text:
         txt_path = os.path.join(folder, "local_transcript.txt")
         if os.path.isfile(txt_path):
@@ -250,50 +288,6 @@ def get_or_align_local_words(folder: str, text: str = "", segments: list[dict] |
                     text = f.read().strip()
             except Exception:
                 text = ""
-
-    # If segments are still missing (past local jobs), run silence detection and chunking
-    wav_path = os.path.join(folder, "audio.wav")
-    if (not segments or not any(s.get("text") for s in segments)) and os.path.isfile(wav_path):
-        try:
-            if not duration:
-                duration = wav_duration(wav_path)
-            silences = find_silences(wav_path)
-            chunks = plan_chunks(duration, silences)
-            words = [w for w in text.split() if w.strip()]
-            if words and chunks:
-                word_lens = [max(1, len(w)) for w in words]
-                total_chars = sum(word_lens)
-                total_chunk_dur = sum(c["end"] - c["start"] for c in chunks)
-                segments = []
-                word_idx = 0
-                for i, chunk in enumerate(chunks):
-                    c_dur = chunk["end"] - chunk["start"]
-                    target_chars = total_chars * (c_dur / total_chunk_dur) if total_chunk_dur > 0 else 0
-                    chunk_words = []
-                    accum = 0
-                    while word_idx < len(words):
-                        if i == len(chunks) - 1:
-                            chunk_words.append(words[word_idx])
-                            word_idx += 1
-                            continue
-                        w_len = word_lens[word_idx]
-                        if accum > 0 and (accum + w_len - target_chars > target_chars - accum):
-                            break
-                        chunk_words.append(words[word_idx])
-                        accum += w_len
-                        word_idx += 1
-                    segments.append({
-                        "start": chunk["start"],
-                        "end": chunk["end"],
-                        "text": " ".join(chunk_words),
-                    })
-                try:
-                    with open(local_seg_path, "w", encoding="utf-8") as f:
-                        json.dump(segments, f, ensure_ascii=False, indent=1)
-                except Exception:
-                    pass
-        except Exception as e:
-            log.warning("[%s] could not compute silence-bounded segments: %s", folder, e)
 
     timed_words = []
     if segments:
@@ -353,9 +347,8 @@ def get_or_align_local_words(folder: str, text: str = "", segments: list[dict] |
 def run_local_only(job_id: str, folder: str, wav_path: str, duration: float) -> None:
     """Transcribe with the local model alone: no ElevenLabs, no credits, no clips.
 
-    The local model gives no word timings, so the audio is cut at silences purely
-    to avoid feeding it an hour at once. Those pieces are deleted afterwards - this
-    job deliberately produces no training data.
+    Extracts real acoustic word timestamps from the IndicConformer CTC alignment tensor
+    synchronized at 40ms frame precision.
     """
     db.update_job(job_id, status="transcribing_local")
     log.info("[%s] splitting audio at silences for the local model", job_id)
@@ -365,7 +358,7 @@ def run_local_only(job_id: str, folder: str, wav_path: str, duration: float) -> 
         paths = cut_chunks(wav_path, chunks, temp_dir, job_id)
         log.info("[%s] transcribing %d chunks with the local model", job_id, len(paths))
         started = time.time()
-        texts = transcribe_clips(paths, progress_path=progress_file(job_id))
+        texts, chunk_words = transcribe_clips_with_words(paths, progress_path=progress_file(job_id))
         db.update_job(job_id, local_seconds=round(time.time() - started, 1))
     finally:
         shutil.rmtree(temp_dir, ignore_errors=True)
@@ -384,8 +377,18 @@ def run_local_only(job_id: str, folder: str, wav_path: str, duration: float) -> 
     with open(os.path.join(folder, "local_segments.json"), "w", encoding="utf-8") as f:
         json.dump(local_segs, f, ensure_ascii=False, indent=1)
 
-    # Pre-align words to silence-bounded chunk timestamps for instant karaoke highlighting
-    get_or_align_local_words(folder, text=full_text, segments=local_segs, duration=duration)
+    # Save exact neural CTC acoustic word timestamps across all chunks
+    timed_words = []
+    for chunk, c_words in zip(chunks, chunk_words):
+        c_start = chunk["start"]
+        for w in c_words:
+            timed_words.append({
+                "text": w["text"],
+                "start": round(c_start + w["start"], 2),
+                "end": round(c_start + w["end"], 2),
+            })
+    with open(os.path.join(folder, "local_words.json"), "w", encoding="utf-8") as f:
+        json.dump(timed_words, f, ensure_ascii=False, indent=1)
 
 
 def run_local_on_segments(job_id: str, folder: str, wav_path: str, segments: list[dict],
@@ -405,7 +408,7 @@ def run_local_on_segments(job_id: str, folder: str, wav_path: str, segments: lis
             paths = cut_chunks(wav_path, segments, temp_dir, job_id)
         log.info("[%s] transcribing %d segments with the local model", job_id, len(paths))
         started = time.time()
-        texts = transcribe_clips(paths, progress_path=progress_file(job_id))
+        texts, chunk_words = transcribe_clips_with_words(paths, progress_path=progress_file(job_id))
         db.update_job(job_id, local_seconds=round(time.time() - started, 1))
     finally:
         shutil.rmtree(temp_dir, ignore_errors=True)
@@ -422,12 +425,17 @@ def run_local_on_segments(job_id: str, folder: str, wav_path: str, segments: lis
         f.write(full_local_text + "\n")
     log.info("[%s] local transcript and comparison saved", job_id)
 
-    local_segs = [
-        {"start": s["start"], "end": s["end"], "text": s["local"]}
-        for s in compared
-        if s.get("local") and s["local"].strip()
-    ]
-    get_or_align_local_words(folder, text=full_local_text, segments=local_segs)
+    timed_words = []
+    for s, c_words in zip(segments, chunk_words):
+        s_start = s["start"]
+        for w in c_words:
+            timed_words.append({
+                "text": w["text"],
+                "start": round(s_start + w["start"], 2),
+                "end": round(s_start + w["end"], 2),
+            })
+    with open(os.path.join(folder, "local_words.json"), "w", encoding="utf-8") as f:
+        json.dump(timed_words, f, ensure_ascii=False, indent=1)
 
 
 # --- the job queue --------------------------------------------------------

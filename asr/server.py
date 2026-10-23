@@ -152,11 +152,14 @@ def transcribe(request: TranscribeRequest):
         print(f"[asr] model loaded, holding {_rss_mb()} MB", flush=True)
 
         texts: list[str] = []
+        chunk_words: list[list[dict]] = []
         transcribing_started = time.time()
         _write_progress(progress_path, 0, len(paths), transcribing_started)
         for start in range(0, len(paths), GROUP_SIZE):
             group = paths[start:start + GROUP_SIZE]
-            texts.extend(common.transcribe(model, group, batch_size))
+            t_batch, w_batch = common.transcribe_with_words(model, group, batch_size)
+            texts.extend(t_batch)
+            chunk_words.extend(w_batch)
             # Give the memory back before starting the next group, so a long
             # lecture does not slowly climb into the container's limit.
             gc.collect()
@@ -165,7 +168,7 @@ def transcribe(request: TranscribeRequest):
 
         took = time.time() - started
         print(f"[asr] transcribed {len(texts)} clips in {took:.1f}s, holding {_rss_mb()} MB", flush=True)
-        return {"texts": texts, "seconds_taken": round(took, 1),
+        return {"texts": texts, "chunk_words": chunk_words, "seconds_taken": round(took, 1),
                 "decoder": request.decoder, "batch_size": batch_size}
     except SystemExit as e:
         # common.checkpoint_path() raises SystemExit with a readable explanation

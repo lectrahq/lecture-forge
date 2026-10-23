@@ -29,7 +29,7 @@ We analyzed the internal architecture of AI4Bharat's `EncDecHybridRNNTCTCBPEMode
 
 ---
 
-
+## 2026-10-23 — Local ASR model word-by-word karaoke synchronization & click-to-seek [MAJOR]
 
 **What changed:** Lectures transcribed using the local AI4Bharat IndicConformer model (or with `engine="local"`) previously showed plain, static text in the transcript pane without any interactive words or audio tracking, because the local ASR model only outputs un-timed text strings without phoneme or word timestamps.
 

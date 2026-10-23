@@ -382,7 +382,7 @@ function StickyNavbar({ activeTab, onSelectTab, jobsCount, currentId, usage }) {
   return (
     <nav className="site-navbar">
       <div className="site-navbar-inner">
-        <a href="#library" className="nav-brand" onClick={(e) => { e.preventDefault(); onSelectTab("library"); }}>
+        <a href="#transcribe" className="nav-brand" onClick={(e) => { e.preventDefault(); onSelectTab("transcribe"); }}>
           <div className="nav-brand-icon">
             <IconWaveform />
           </div>
@@ -395,17 +395,17 @@ function StickyNavbar({ activeTab, onSelectTab, jobsCount, currentId, usage }) {
         <div className="nav-links">
           <button
             type="button"
-            className={`nav-link-btn ${activeTab === "library" ? "active-tab" : ""}`}
-            onClick={() => onSelectTab("library")}
-          >
-            <IconList /> Library <span className="nav-badge">{jobsCount}</span>
-          </button>
-          <button
-            type="button"
             className={`nav-link-btn ${activeTab === "transcribe" ? "active-tab" : ""}`}
             onClick={() => onSelectTab("transcribe")}
           >
             <IconPlus /> Transcribe
+          </button>
+          <button
+            type="button"
+            className={`nav-link-btn ${activeTab === "library" ? "active-tab" : ""}`}
+            onClick={() => onSelectTab("library")}
+          >
+            <IconList /> Library <span className="nav-badge">{jobsCount}</span>
           </button>
           {currentId && (
             <button
@@ -452,19 +452,19 @@ function MobileBottomDock({ activeTab, onSelectTab, jobsCount, currentId }) {
       <div className="mobile-dock-inner">
         <button
           type="button"
-          className={`mobile-dock-btn ${activeTab === "library" ? "active" : ""}`}
-          onClick={() => onSelectTab("library")}
-        >
-          <IconList />
-          <span>Library</span>
-        </button>
-        <button
-          type="button"
           className={`mobile-dock-btn ${activeTab === "transcribe" ? "active" : ""}`}
           onClick={() => onSelectTab("transcribe")}
         >
           <IconPlus />
           <span>New</span>
+        </button>
+        <button
+          type="button"
+          className={`mobile-dock-btn ${activeTab === "library" ? "active" : ""}`}
+          onClick={() => onSelectTab("library")}
+        >
+          <IconList />
+          <span>Library</span>
         </button>
         {currentId && (
           <button
@@ -501,7 +501,7 @@ function MobileBottomDock({ activeTab, onSelectTab, jobsCount, currentId }) {
 export default function App() {
   const [jobs, setJobs] = useState([]);
 
-  // URL Hash Routing: #library, #transcribe, #job/<id>, #datasets, #dictionary
+  // URL Hash Routing: #transcribe (default), #library, #job/<id>, #datasets, #dictionary
   const parseHash = () => {
     const raw = (window.location.hash || "").replace(/^#/, "").trim();
     if (raw.startsWith("job/")) {
@@ -509,10 +509,10 @@ export default function App() {
       return { tab: "workspace", jobId: jid || null };
     }
     if (raw === "active-job" || raw === "workspace") return { tab: "workspace", jobId: null };
-    if (raw === "transcribe" || raw === "ingest" || raw === "new") return { tab: "transcribe", jobId: null };
+    if (raw === "library") return { tab: "library", jobId: null };
     if (raw === "datasets" || raw === "dataset") return { tab: "datasets", jobId: null };
     if (raw === "spelling" || raw === "dictionary") return { tab: "dictionary", jobId: null };
-    return { tab: "library", jobId: null };
+    return { tab: "transcribe", jobId: null };
   };
 
   const initial = parseHash();

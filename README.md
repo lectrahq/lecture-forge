@@ -74,6 +74,12 @@ with an error message). Work runs asynchronously in the background.
    - Isolated GPU hardware-composited navigation dock (`translate3d(0,0,0)`) prevents inertial scroll jumping.
    - Responsive multi-column to single-column degradation with zero horizontal clipping.
 
+7. **Live Classroom Microphone Recording Studio**:
+   - Record in-person college lectures directly from smartphone or laptop microphones (`navigator.mediaDevices.getUserMedia`).
+   - Real-time animated VU visualizer (Web Audio API `AnalyserNode`) and live stopwatch timer (`00:00:00`) with pause and resume support.
+   - Built-in audio clarity preview player before submitting.
+   - Automatically packaged and converted by the backend into uncompressed 16 kHz WAV, feeding directly into the chosen transcription engine and dataset pipeline.
+
 ### Choosing how a lecture is transcribed
 
 Two questions on the submit form:

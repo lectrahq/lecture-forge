@@ -3,6 +3,32 @@
 Newest entries first. MAJOR = new feature or change to how the system is built or
 deployed; MINOR = small fix, wording or documentation change.
 
+## 2026-10-24 — Mobile Browser Layout Overhaul: Full-Width Viewport & Content Density Optimization [MAJOR]
+
+**What changed:** 
+1. **Elimination of Side Gutters and Reclaiming Screen Width:**
+   - **Root Cause:** Mobile screens previously suffered from 136px of combined horizontal gutters (`16px body padding` + `20px page padding` + `16px card padding` + `16px transcript-text padding` on each side), consuming ~38% of the width on 360px–390px phone screens. This squeezed text into a tiny ~230px column, forcing unnatural line wrapping after 2–3 words and creating a vertical wall of text.
+   - **Body & Page Expansion:** Removed artificial 16px body side padding on mobile (`<= 768px`) in favor of hardware `env(safe-area-inset-left/right)`. Reduced `.page` horizontal padding from 20px to 8px (and 4px on screens `<= 480px`).
+   - **Card & Workspace Modernization:** Reduced `.card` padding to 12px 10px on mobile and 10px 6px on small screens. `.active-workspace-card` now expands comfortably edge-to-edge.
+   - **Full-Width Readable Transcript:** Reduced `.transcript-text` padding from 16px to 10px 8px (and 8px 6px on `<= 480px`), increasing usable horizontal text reading width by **+96px (+40% wider text column)**. Line height tuned to 1.8 with 0.98rem font size so Malayalam and English sentences breathe naturally without endless wrapping.
+2. **De-Cluttering Mobile Text Density:**
+   - **Workspace Header Streamlining:** Added `mobile-workspace-hide` to the global marketing header (`<header>`) when viewing an active lecture (`activeTab === "workspace"`). Because the sticky top navbar already provides the brand title, quota counter, and theme toggle, hiding the marketing banner allows the active lecture title, audio player, and synchronized karaoke transcript to appear instantly above the fold without endless scrolling.
+   - **Engine Timers Side-by-Side Grid:** Converted `.job-timers-grid` from vertically stacked monoliths to a compact 2-column side-by-side grid (`grid-template-columns: 1fr 1fr; gap: 6px;`). Hidden verbose multi-paragraph footnotes on mobile, reducing vertical timer footprint from ~250px down to ~55px.
+   - **Scrollable Pipeline Stages Bar:** Transformed `.stages` from a multi-line wrapping list with broken connector lines into a smooth, horizontal scrollable pill bar (`overflow-x: auto; flex-wrap: nowrap; scrollbar-width: none`).
+   - **Mobile Audio Player Refinement:** Removed redundant desktop volume slider on mobile (`display: none`), prioritizing full-width timeline scrubber and finger-friendly 8px scrubber track with 16px touch thumb.
+   - **Acoustic Health & Library Cards:** Compacted `AudioHealthCard` to a 2x2 grid (`grid-template-columns: 1fr 1fr; gap: 6px;`), streamlined `.job-card` padding to 10px 10px, and refined `.modal-dialog` padding for mobile touchscreens.
+
+**Files touched:**
+- `frontend/src/App.jsx` — added dynamic `mobile-workspace-hide` class to `<header>` during active workspace view.
+- `frontend/src/App.css` — restructured base component definitions before media queries; overhauled responsive design system across `@media (max-width: 768px)`, `@media (max-width: 600px)`, `@media (max-width: 480px)`, and `@media (max-width: 375px)`.
+
+**How to check it:**
+1. Open https://forge.rejected.cc on any mobile browser (or in Chrome DevTools Device Mode set to iPhone 12/14, Pixel 7, or Galaxy S20).
+2. Note that the left and right side gutters are gone, cards and transcript text fill the phone width cleanly.
+3. Open any lecture in the Workspace: the active lecture title, player, timers, and karaoke transcript appear immediately with full horizontal width and smooth Malayalam word spacing.
+
+---
+
 ## 2026-10-24 — Permanent Deletion of Local Model Transcriptions & Immediate Audio Player Duration Fix [MAJOR]
 
 **What changed:** 

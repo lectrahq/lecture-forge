@@ -779,7 +779,7 @@ export default function App() {
       />
 
       <div className="page" id="top">
-        <header>
+        <header className={activeTab === "workspace" ? "mobile-workspace-hide" : ""}>
           <div className="header-row">
             <div className="brand-wrapper">
               <div className="brand-icon">

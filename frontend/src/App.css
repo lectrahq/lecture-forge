@@ -3086,170 +3086,6 @@ button.alt:hover {
   }
 }
 
-@media (max-width: 768px) {
-  html, body {
-    overflow-x: hidden;
-    max-width: 100vw;
-  }
-  body {
-    padding-bottom: calc(76px + env(safe-area-inset-bottom, 0px)); /* space for mobile dock + safe area */
-    background-attachment: scroll; /* smooth scroll on mobile touch screens */
-  }
-  .page {
-    padding-block: var(--s4) var(--s8);
-    gap: var(--s4);
-    max-width: 100%;
-    overflow-x: hidden;
-  }
-  .card {
-    padding: var(--s4);
-    border-radius: var(--r-md);
-  }
-  .site-navbar-inner {
-    padding: 8px 12px;
-    gap: 8px;
-    max-width: 100%;
-  }
-  .site-navbar .nav-links {
-    display: none; /* accessible via floating bottom dock */
-  }
-  .nav-brand {
-    gap: 8px;
-    min-width: 0;
-  }
-  .nav-brand-icon {
-    width: 30px;
-    height: 30px;
-  }
-  .nav-brand-title {
-    font-size: 0.95rem;
-    white-space: nowrap;
-  }
-  .nav-right {
-    gap: 6px;
-    min-width: 0;
-  }
-  .nav-quota-pill {
-    padding: 3px 8px;
-    font-size: 0.74rem;
-  }
-  .theme-switch {
-    padding: 2px;
-    gap: 1px;
-    align-self: auto;
-  }
-  .theme-switch button {
-    padding: 5px 8px;
-    font-size: 0.74rem;
-    gap: 4px;
-    min-height: 32px;
-  }
-  .mobile-bottom-dock {
-    display: block;
-  }
-  .header-row {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-  .usage {
-    padding: var(--s4);
-  }
-  .usage-tools-grid {
-    padding-left: 0;
-    border-left: none;
-    padding-top: var(--s3);
-    border-top: 1px solid var(--border);
-    width: 100%;
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-    gap: var(--s2);
-  }
-  .usage-tool-card {
-    min-width: 0;
-    padding: var(--s3);
-  }
-  .usage-tool {
-    padding-left: 0;
-    border-left: none;
-    padding-top: var(--s3);
-    border-top: 1px solid var(--border);
-    width: 100%;
-  }
-  .choice-grid {
-    grid-template-columns: 1fr;
-  }
-  .job-card-top {
-    display: grid;
-    justify-items: start;
-    gap: var(--s1);
-  }
-  .spelling {
-    grid-template-columns: 1fr;
-  }
-  .spelling-actions {
-    justify-content: flex-start;
-  }
-  .transcript-text {
-    padding: var(--s4);
-    font-size: 1rem;
-  }
-  .toast-container {
-    left: 16px;
-    right: 16px;
-    bottom: 80px;
-  }
-  .desktop-table-view {
-    display: none !important;
-  }
-  .compare-mobile-cards {
-    display: flex !important;
-  }
-  input, textarea, select {
-    font-size: 16px !important; /* prevent iOS auto-zoom */
-  }
-  button, .button {
-    min-height: 44px; /* touch-friendly minimum */
-  }
-}
-
-@media (max-width: 600px) {
-  .theme-switch-label {
-    display: none;
-  }
-  .theme-switch button {
-    padding: 5px 7px;
-    min-height: 30px;
-  }
-  .nav-quota-full {
-    display: none;
-  }
-  .nav-quota-compact {
-    display: inline;
-  }
-  .nav-brand-title {
-    font-size: 0.92rem;
-  }
-}
-
-@media (max-width: 375px) {
-  .site-navbar-inner {
-    padding: 6px 8px;
-    gap: 6px;
-  }
-  .nav-brand-title {
-    font-size: 0.88rem;
-  }
-  .nav-quota-pill {
-    padding: 2px 6px;
-    font-size: 0.7rem;
-  }
-  .mobile-dock-btn {
-    padding: 6px 4px;
-    min-width: 48px;
-    font-size: 0.68rem;
-  }
-}
-
 /* --- Full In-Browser Lecture Audio Player --- */
 .full-audio-player {
   margin: var(--s3) 0 var(--s4);
@@ -3730,4 +3566,607 @@ button.alt:hover {
   color: var(--bad);
   background: var(--bad-soft);
 }
+
+/* ===================================================================
+   Responsive Mobile & Tablet Design System
+   Eliminates horizontal blank space and declutters text density
+   =================================================================== */
+
+@media (max-width: 768px) {
+  html, body {
+    overflow-x: hidden;
+    max-width: 100vw;
+  }
+  body {
+    /* Safe area margins only: eliminate 16px desktop body side gutters */
+    padding-left: env(safe-area-inset-left, 0px) !important;
+    padding-right: env(safe-area-inset-right, 0px) !important;
+    padding-bottom: calc(76px + env(safe-area-inset-bottom, 0px)); /* space for floating bottom dock */
+    background-attachment: scroll;
+  }
+
+  /* Expand main page container to utilize full mobile width */
+  .page {
+    padding-inline: 8px !important;
+    padding-block: 8px 24px;
+    gap: 12px;
+    max-width: 100vw;
+    overflow-x: hidden;
+  }
+
+  /* Compact glass card padding to maximize readable text width */
+  .card {
+    padding: 12px 10px;
+    border-radius: 12px;
+  }
+
+  /* Sticky top navigation bar */
+  .site-navbar-inner {
+    padding: 8px 10px;
+    gap: 8px;
+    max-width: 100%;
+  }
+  .site-navbar .nav-links {
+    display: none; /* Accessible via bottom dock */
+  }
+  .nav-brand {
+    gap: 8px;
+    min-width: 0;
+  }
+  .nav-brand-icon {
+    width: 28px;
+    height: 28px;
+    border-radius: 6px;
+  }
+  .nav-brand-title {
+    font-size: 0.92rem;
+    white-space: nowrap;
+  }
+  .nav-right {
+    gap: 6px;
+    min-width: 0;
+  }
+  .nav-quota-pill {
+    padding: 3px 8px;
+    font-size: 0.74rem;
+  }
+  .theme-switch {
+    padding: 2px;
+    gap: 1px;
+    align-self: auto;
+  }
+  .theme-switch button {
+    padding: 5px 8px;
+    font-size: 0.74rem;
+    gap: 4px;
+    min-height: 32px;
+  }
+
+  /* Mobile floating dock */
+  .mobile-bottom-dock {
+    display: block;
+  }
+
+  /* Global Header: Compact and de-cluttered on mobile */
+  header {
+    gap: 4px;
+    padding-bottom: 2px;
+  }
+  header.mobile-workspace-hide {
+    display: none; /* Hide marketing header when focused on an active lecture */
+  }
+  .header-row {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+  .brand-wrapper {
+    gap: 8px;
+  }
+  .brand-icon {
+    display: none; /* Brand icon is already present in sticky top navbar */
+  }
+  .brand-tag {
+    display: none; /* Hide secondary tag on mobile */
+  }
+  header h1 {
+    font-size: 1.25rem;
+    line-height: 1.25;
+  }
+  header .subtitle {
+    font-size: 0.78rem;
+    line-height: 1.35;
+    color: var(--text-faint);
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  header .theme-switch {
+    display: none; /* Navbar already contains theme switcher */
+  }
+
+  /* Active Workspace View */
+  .view-pane {
+    gap: 10px;
+  }
+  .active-workspace-card {
+    padding: 12px 8px !important;
+    border-radius: 10px;
+    border-top: 3px solid var(--accent);
+  }
+  .active-job-topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-bottom: 8px;
+    margin-bottom: 8px;
+    gap: 6px;
+  }
+  .back-to-library-btn {
+    padding: 5px 10px;
+    font-size: 0.76rem;
+    min-height: 32px;
+    border-radius: 6px;
+  }
+  .active-job-topbar .mono.small {
+    font-size: 0.72rem;
+  }
+
+  /* Job Status & Metadata */
+  .active-workspace-card h2 {
+    font-size: 1.15rem;
+    line-height: 1.3;
+    margin-bottom: 4px;
+    word-break: break-word;
+  }
+  .active-workspace-card p.muted.small {
+    font-size: 0.78rem;
+    line-height: 1.4;
+    margin-top: 2px !important;
+  }
+  .badges {
+    gap: 4px !important;
+    margin: 6px 0 8px;
+  }
+  .badge {
+    font-size: 0.72rem;
+    padding: 2px 7px;
+    gap: 4px;
+  }
+  .badge svg {
+    width: 12px;
+    height: 12px;
+  }
+  .delete-lecture-btn {
+    padding: 4px 8px;
+    font-size: 0.74rem;
+    min-height: 32px;
+    gap: 4px;
+  }
+
+  /* Audio Player Overhaul on Mobile */
+  .full-audio-player {
+    padding: 10px 8px;
+    gap: 8px;
+    margin: 8px 0 10px;
+    border-radius: 10px;
+  }
+  .player-top-row {
+    gap: 6px;
+  }
+  .player-status-badge {
+    font-size: 0.76rem;
+    gap: 6px;
+  }
+  .player-top-actions {
+    gap: 6px;
+  }
+  .player-download-btn {
+    font-size: 0.72rem;
+    padding: 3px 8px;
+    min-height: 28px;
+  }
+  .player-main-controls {
+    gap: 8px;
+    align-items: center;
+  }
+  .player-big-play-btn {
+    width: 38px;
+    height: 38px;
+  }
+  .player-big-play-btn svg {
+    width: 16px;
+    height: 16px;
+  }
+  .player-skip-btn {
+    height: 30px;
+    padding: 0 6px;
+    font-size: 0.72rem;
+    min-height: 30px;
+  }
+  .player-speed-pills {
+    padding: 1px;
+  }
+  .player-speed-btn {
+    padding: 2px 5px;
+    font-size: 0.68rem;
+    min-height: 26px;
+  }
+  .player-volume-wrap {
+    display: none !important; /* Phones use hardware rocker buttons */
+  }
+  .player-timeline-wrap {
+    width: 100%;
+    flex: 1 1 100%;
+    min-width: 0;
+    order: 3;
+    gap: 8px;
+  }
+  .player-time-label {
+    font-size: 0.72rem;
+    min-width: 36px;
+  }
+  .player-scrubber {
+    height: 8px;
+  }
+  .player-scrubber::-webkit-slider-thumb {
+    width: 16px;
+    height: 16px;
+  }
+
+  /* Engine Timers: Side-by-side 2-column grid instead of vertical stacked monoliths */
+  .job-timers-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+    margin: 8px 0;
+  }
+  .job-timer-box {
+    padding: 8px 8px;
+    gap: 3px;
+    border-radius: 8px;
+  }
+  .job-timer-top {
+    gap: 4px;
+  }
+  .job-timer-title {
+    font-size: 0.74rem;
+    gap: 4px;
+  }
+  .job-timer-title svg {
+    width: 13px;
+    height: 13px;
+  }
+  .job-timer-status {
+    font-size: 0.64rem;
+    padding: 1px 5px;
+  }
+  .job-timer-display {
+    gap: 4px;
+    align-items: baseline;
+  }
+  .job-timer-value {
+    font-size: 1.15rem;
+  }
+  .job-timer-speed {
+    font-size: 0.68rem;
+    padding: 1px 4px;
+  }
+  .job-timer-footnote {
+    display: none; /* Hide heavy explanatory text on mobile */
+  }
+
+  /* Stages: Horizontal scrollable pill bar */
+  .stages {
+    display: flex;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    padding: 6px 8px;
+    margin: 8px 0;
+    gap: 6px;
+    border-radius: 8px;
+  }
+  .stages::-webkit-scrollbar {
+    display: none;
+  }
+  .stages li:not(:last-child)::after {
+    display: none;
+  }
+  .stages li {
+    flex: 0 0 auto;
+    font-size: 0.72rem;
+    padding: 3px 8px;
+    background: var(--surface-3);
+    border-radius: var(--r-full);
+    gap: 5px;
+  }
+  .stages li::before {
+    width: 7px;
+    height: 7px;
+  }
+
+  /* Acoustic Quality Card */
+  .audio-health-card {
+    margin-top: 8px;
+    padding: 10px 8px;
+    border-radius: 8px;
+  }
+  .health-card-header {
+    gap: 6px;
+  }
+  .health-icon-wrap {
+    width: 30px;
+    height: 30px;
+  }
+  .health-title-group h4 {
+    font-size: 0.88rem;
+  }
+  .health-title-group .muted.small {
+    font-size: 0.72rem;
+  }
+  .health-metrics-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+    margin-top: 6px;
+  }
+  .health-metric {
+    padding: 6px 8px;
+    border-radius: 6px;
+  }
+  .health-metric .metric-label {
+    font-size: 0.68rem;
+  }
+  .health-metric .metric-value {
+    font-size: 1.05rem;
+  }
+  .health-metric .metric-note {
+    font-size: 0.68rem;
+    line-height: 1.3;
+  }
+  .health-recommendations {
+    margin-top: 6px;
+    padding: 6px 8px;
+    font-size: 0.76rem;
+  }
+
+  /* Transcripts: Maximize width & comfortable readability */
+  .transcript {
+    margin-top: 10px;
+    padding-top: 8px;
+  }
+  .transcript-head {
+    margin-bottom: 6px;
+    gap: 6px;
+  }
+  .transcript-head h3 {
+    font-size: 0.95rem;
+  }
+  .transcript-head .muted.small {
+    font-size: 0.74rem;
+    display: block;
+  }
+  .transcript-toolbar {
+    gap: 5px;
+    width: 100%;
+    justify-content: flex-start;
+  }
+  .transcript-mini-play-btn,
+  .autoscroll-toggle-btn,
+  .transcript-toolbar button {
+    padding: 5px 9px;
+    font-size: 0.74rem;
+    min-height: 32px;
+  }
+  .transcript-text {
+    padding: 10px 8px !important;
+    font-size: 0.98rem !important;
+    line-height: 1.8 !important;
+    max-height: 520px;
+    border-radius: 8px;
+    letter-spacing: 0.01em;
+  }
+  .k-word {
+    padding: 1px 2px;
+    margin: 0;
+  }
+  .second-transcript {
+    margin-top: 10px;
+  }
+
+  /* Library Job Cards */
+  .job-card {
+    padding: 10px 10px;
+    border-radius: 8px;
+  }
+  .job-card-top {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
+  .job-card-title {
+    font-size: 0.92rem;
+    line-height: 1.3;
+  }
+  .job-card-meta {
+    font-size: 0.78rem;
+    line-height: 1.4;
+  }
+  .job-card-timers {
+    gap: 4px;
+    margin-top: 4px;
+  }
+  .timer-badge {
+    font-size: 0.68rem;
+    padding: 1px 6px;
+  }
+
+  /* Form & Ingest Controls */
+  .choice-grid {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+  .choice-card {
+    padding: 10px 10px;
+    border-radius: 8px;
+  }
+  .file-dropzone {
+    padding: 18px 10px;
+    border-radius: 10px;
+  }
+  .keyterm-chips {
+    gap: 4px;
+  }
+  .keyterm-chip {
+    padding: 2px 7px;
+    font-size: 0.72rem;
+  }
+  .usage {
+    padding: 10px 8px;
+  }
+  .usage-tools-grid {
+    padding-left: 0;
+    border-left: none;
+    padding-top: var(--s3);
+    border-top: 1px solid var(--border);
+    width: 100%;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+  }
+  .usage-tool-card {
+    min-width: 0;
+    padding: 8px 8px;
+    border-radius: 8px;
+  }
+  .usage-tool {
+    padding-left: 0;
+    border-left: none;
+    padding-top: var(--s3);
+    border-top: 1px solid var(--border);
+    width: 100%;
+  }
+
+  /* Spelling & Segment Verifier */
+  .spelling {
+    grid-template-columns: 1fr;
+  }
+  .spelling-actions {
+    justify-content: flex-start;
+  }
+  .verifier-segment-card {
+    padding: 8px;
+  }
+  .verifier-score-pill {
+    font-size: 0.7rem;
+    padding: 2px 6px;
+  }
+
+  /* Comparison Views */
+  .desktop-table-view {
+    display: none !important;
+  }
+  .compare-mobile-cards {
+    display: flex !important;
+  }
+
+  /* Toast Notifications */
+  .toast-container {
+    left: 10px;
+    right: 10px;
+    bottom: 80px;
+  }
+
+  /* Mobile Modals */
+  .modal-backdrop {
+    padding: 8px;
+  }
+  .modal-dialog {
+    max-width: 100%;
+    border-radius: 12px;
+  }
+  .modal-header {
+    padding: 14px 16px 12px;
+  }
+  .modal-body {
+    padding: 14px 16px;
+    font-size: 0.88rem;
+  }
+  .modal-footer {
+    padding: 12px 16px 16px;
+  }
+
+  /* Inputs & Touch Targets */
+  input, textarea, select {
+    font-size: 16px !important; /* prevent iOS auto-zoom */
+  }
+  button, .button {
+    min-height: 40px;
+  }
+}
+
+@media (max-width: 600px) {
+  .theme-switch-label {
+    display: none;
+  }
+  .theme-switch button {
+    padding: 5px 7px;
+    min-height: 30px;
+  }
+  .nav-quota-full {
+    display: none;
+  }
+  .nav-quota-compact {
+    display: inline;
+  }
+  .nav-brand-title {
+    font-size: 0.90rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .page {
+    padding-inline: 4px !important;
+    gap: 8px;
+  }
+  .card {
+    padding: 10px 6px;
+    border-radius: 10px;
+  }
+  .active-workspace-card {
+    padding: 10px 6px !important;
+  }
+  .site-navbar-inner {
+    padding: 6px 8px;
+    gap: 6px;
+  }
+  .transcript-text {
+    padding: 8px 6px !important;
+    font-size: 0.95rem !important;
+    line-height: 1.75 !important;
+  }
+}
+
+@media (max-width: 375px) {
+  .site-navbar-inner {
+    padding: 5px 6px;
+    gap: 4px;
+  }
+  .nav-brand-title {
+    font-size: 0.85rem;
+  }
+  .nav-quota-pill {
+    padding: 2px 5px;
+    font-size: 0.68rem;
+  }
+  .mobile-dock-btn {
+    padding: 5px 3px;
+    min-width: 44px;
+    font-size: 0.66rem;
+  }
+}
+
 

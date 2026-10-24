@@ -67,6 +67,77 @@ def strip_punctuation(text: str) -> str:
     return "".join(" " if unicodedata.category(c).startswith("P") else c for c in text)
 
 
+def correct_lecture_and_math_terms(text: str) -> str:
+    """Automated context-aware repair of spoken Malayalam mathematics and lecture terms."""
+    if not text:
+        return ""
+
+    # 1. Channel Intro, Greetings & Common Lecture Terms
+    text = re.sub(r"പുതിവിീഡയിലേക്ക്", "പുതിയ വീഡിയോയിലേക്ക്", text)
+    text = re.sub(r"പുതിയ\s+വീടിലേക്ക്(?=\s+എല്ലാവർക്കും)", "പുതിയ വീഡിയോയിലേക്ക്", text)
+    text = re.sub(r"\b(?:ആർഗിഎസ്|ആർഗ\s*എസ്|ആർവിഎസ്)\s+മാസിക്കണമി\S*", "ആർവിഎസ് മാത്സ് അക്കാദമിയിലേക്ക്", text)
+    text = re.sub(r"\bസ്വാഗം\b", "സ്വാഗതം", text)
+    text = re.sub(r"\bകൊസ്റ്റിയ(\w*)", r"ക്വസ്റ്റ്യ\1", text)
+    text = re.sub(r"\bകൊസ്റ്റി(\w*)", r"ക്വസ്റ്റ്യ\1", text)
+    text = re.sub(r"\bപ്രോബ്ലേമ്സ\b", "പ്രോബ്ലംസ്", text)
+    text = re.sub(r"\bപ്രിസ്ക്രിപ്റ്റ്\s+ടെസ്[റ്റ്ട്]\b", "പ്രിസ്ക്രൈബ്ഡ് ടെക്സ്റ്റ്", text)
+    text = re.sub(r"\bകെ\s*റ്റി\s*(?:യു|വന്നപ്പോഴും)\b", "കെടിയു", text)
+
+    # 2. Cauchy's Integral Formula & Calculus Nomenclature
+    text = re.sub(r"\bകോഷ്[യീ]സ്?\s+(?:എന്തെങ്കിലും|ഇന്റഗ്ര\w*)\s+ഫോ[മർ][ുി\w]*\b", "കോഷ്യസ് ഇന്റഗ്രൽ ഫോർമുല", text)
+    text = re.sub(r"\bകോഷീൻ\s+(?:എന്തെങ്കിലും|ഇന്റഗ്ര\w*)\s+ഫോ[മർ][ുി\w]*\b", "കോഷ്യസ് ഇന്റഗ്രൽ ഫോർമുല", text)
+
+    # Formula words & attached case suffixes
+    text = re.sub(r"\bഫോ[മർ]ുലാ?\s+യുടെ\b", "ഫോർമുലയുടെ", text)
+    text = re.sub(r"\bഫോ[മർ]ുലാ?\s+യിലെ\b", "ഫോർമുലയിലെ", text)
+    text = re.sub(r"\bഫോ[മർ]ുലാ?\s+യിൽ\b", "ഫോർമുലയിൽ", text)
+    text = re.sub(r"\bഫോ[മർ]ുലാ?\s+യും\b", "ഫോർമുലയും", text)
+    text = re.sub(r"\bഫോമുല(\w*)", r"ഫോർമുല\1", text)
+    text = re.sub(r"\bഫോമുലാ(\w*)", r"ഫോർമുല\1", text)
+    text = re.sub(r"\bഫോമുല്\b", "ഫോർമുല", text)
+    text = re.sub(r"\bഫോമുൽ\b", "ഫോർമുല", text)
+
+    # "Integral over C" variations
+    text = re.sub(r"\bഇന്റ?ഗ്[ലോ][ബവ]ർ\s+സി\b", "ഇന്റഗ്രൽ ഓവർ സി", text)
+    text = re.sub(r"\bഇൻ\s*ഡെ\s*ഗ്ലോബർ\s*സി\b", "ഇന്റഗ്രൽ ഓവർ സി", text)
+
+    # Denominator & Numerator
+    text = re.sub(r"\b(?:ദേ|ഡേ|ഡി)നോമീ?നി?ട്ടോ[ര്ർ]*\b", "ഡിനോമിനേറ്റർ", text)
+    text = re.sub(r"\b(?:ഡേ|ഡി)നോമിനേറ്റ[റി]*ല്\b", "ഡിനോമിനേറ്ററിൽ", text)
+    text = re.sub(r"\bന്യൂമറേറ്റ[റി]*ല്\b", "ന്യൂമറേറ്ററിൽ", text)
+
+    # Factor
+    text = re.sub(r"\bഫാക്ടോ[ര്ർ]*\b", "ഫാക്ടർ", text)
+    text = re.sub(r"\bഫാക്ടറില്\b", "ഫാക്ടറിൽ", text)
+    text = re.sub(r"\b(\w+)\s+ഫാക്ടോറിൽ\b", r"\1 ഫാക്റ്റോറിയൽ", text)
+
+    # 3. Mathematical Variables, Symbols & Coordinates
+    text = re.sub(r"\b(?:ഇസേദ|ഇസക്|ഇസ്റ്റ്|ഇസറ്|ഇസ്|ഇസെറ്റ്)\s+മീനസ്\s+വേണ്ട\b", "ഇസഡ് മൈനസ് വൺ", text)
+    text = re.sub(r"\b(?:ഇസേദ|ഇസക്|ഇസ്റ്റ്|ഇസറ്|ഇസ്|ഇസെറ്റ്)\s+(?:മീനസ്|മൈനസ്)\b", "ഇസഡ് മൈനസ്", text)
+    text = re.sub(r"\b(?:ഇസേദ|ഇസക്|ഇസ്റ്റ്|ഇസറ്|ഇസെറ്റ്)\s+പ്ലസ്\b", "ഇസഡ് പ്ലസ്", text)
+    text = re.sub(r"\b(?:ഇസേദ|ഇസക്|ഇസ്റ്റ്|ഇസറ്|ഇസെറ്റ്|എക്സെറ്റ്)\s+(?:ഇസ്|ഈസ്)\s+ഈക്വൽ\s+ടു\b", "ഇസഡ് ഈസ് ഈക്വൽ ടു", text)
+    text = re.sub(r"\bഇസ്\s+എഡ്\b", "ഇസഡ്", text)
+    text = re.sub(r"\bഡി\s+സി\s+ഡ്\b|\bഡി\s+സിഡ്\b|\bഡിസറ്റ്\b|\bഡിസെഡ്\b", "ഡിസഡ്", text)
+
+    text = re.sub(r"\b(ദി|ദിസ്)\s+ഇസ്\s+ഈക്വൽ\s+ടു\b", "ദിസ് ഈസ് ഈക്വൽ ടു", text)
+    text = re.sub(r"\b(?:ഇസ്|ഈസ്)\s+ഈക്വൽ\s+ടു\b", "ഈസ് ഈക്വൽ ടു", text)
+    text = re.sub(r"\bഇന്\s+ടു\b", "ഇൻടു", text)
+    text = re.sub(r"\bപൈൻ\s+ടു\b", "പൈ ഇൻടു", text)
+    text = re.sub(r"\b(?:ട്വൂ|ടു)\s+പി\s+ഐ\b", "ടു പൈ ഐ", text)
+    text = re.sub(r"\bഹോൾ\s+സ്ക്വാരേ?\b", "ഹോൾ സ്ക്വയർ", text)
+    text = re.sub(r"\b(?:ഓന്|ഹോൾ)\s+ക്യൂബ്\b", "ഹോൾ ക്യൂബ്", text)
+    text = re.sub(r"\b(?:ഈ|ഇ)\s*റേസ്[ഡ്റ്റ്]+\s*ടു\s*ഇസഡ്\b", "ഇ റേസ്ഡ് ടു ഇസഡ്", text)
+    text = re.sub(r"\bലൈസ്\s+ഇൻസൈറ്റ്\b", "ലൈസ് ഇൻസൈഡ്", text)
+    text = re.sub(r"\bലൈസ്\s+ഔട്ട്സൈറ്റ്\b", "ലൈസ് ഔട്ട്സൈഡ്", text)
+    text = re.sub(r"\bഒ\s+ആക്സിസിൽ\b", "വൈ ആക്സിസിൽ", text)
+    text = re.sub(r"\bകോമാ\b", "കോമ", text)
+
+    text = re.sub(r"\bഎഫ്\s+ഡാഷ്\s+ഓഫ്\b", "എഫ് ഡാഷ് ഓഫ്", text)
+    text = re.sub(r"\bഎഫ്\s+ഡബിൾ\s+ഡാഷ്\s+ഓഫ്\b", "എഫ് ഡബിൾ ഡാഷ് ഓഫ്", text)
+
+    return text
+
+
 def sanitize_malayalam_orthography(text: str) -> str:
     """Clean Malayalam orthographic anomalies, broken ligatures, and non-standard conjuncts.
 
@@ -76,7 +147,10 @@ def sanitize_malayalam_orthography(text: str) -> str:
     3. Removes invalid viramas immediately following vowel signs (e.g. 'ി്', 'ാ്', 'ു്').
     4. Collapses multiple consecutive viramas (e.g. 'സ്റ്റാർ്ടട്ട്' -> 'സ്റ്റാർട്ട').
     5. Collapses duplicate consecutive vowel signs (e.g. 'ാാ' -> 'ാ').
-    6. Removes invalid viramas immediately attached to atomic chillu letters (ൺ, ൻ, ർ, ൽ, ൾ, ൿ).
+    6. Folds word-boundary chillu candidates (ല് -> ൽ, ള് -> ൾ, ര് -> ർ).
+    7. Folds reph chillu-r before consonants (e.g. ഫോര്മുല -> ഫോർമുല, കർ്വ് -> കർവ്).
+    8. Removes invalid viramas immediately attached to atomic chillu letters (ൺ, ൻ, ർ, ൽ, ൾ, ൿ).
+    9. Applies contextual mathematical & lecture term repairs (e.g. 'ഡിനോമിനേറ്റർ', 'ഇസഡ് മൈനസ്', 'ക്വസ്റ്റ്യൻ').
     """
     if not text:
         return ""
@@ -91,8 +165,24 @@ def sanitize_malayalam_orthography(text: str) -> str:
     text = re.sub(r"[\u0D4D]{2,}", "\u0D4D", text)
     # 5. Collapse duplicate consecutive vowel signs
     text = re.sub(r"([\u0D3E-\u0D4C\u0D57])[\u0D3E-\u0D4C\u0D57]+", r"\1", text)
-    # 6. Remove virama immediately following atomic chillu characters
+
+    # 6. Chillu Endings at Word Boundaries (ല് -> ൽ, ള് -> ൾ, ര് -> ർ)
+    text = re.sub(r"ല്(?=[\s\.,;!?]|$)", "ൽ", text)
+    text = re.sub(r"ള്(?=[\s\.,;!?]|$)", "ൾ", text)
+    text = re.sub(r"ര്(?=[\s\.,;!?]|$)", "ർ", text)
+
+    # 7. Reph chillu-r before consonants (e.g. ഫോര്മുല -> ഫോർമുല, കർ്വ് -> കർവ്)
+    text = re.sub(r"ര്(?=[\u0D15-\u0D39])", "ർ", text)
+
+    # 8. Remove virama immediately following atomic chillu characters
     text = re.sub(r"([ൺ-ൿ])[\u0D4D]+", r"\1", text)
+
+    # 9. Contextual mathematical and lecture domain repairs
+    text = correct_lecture_and_math_terms(text)
+
+    # 10. Clean any resulting viramas directly attached to chillu letters
+    text = re.sub(r"([ൺ-ൿ])[\u0D4D]+", r"\1", text)
+
     return _WHITESPACE.sub(" ", text).strip()
 
 

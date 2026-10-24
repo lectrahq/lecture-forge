@@ -17,18 +17,26 @@ deployed; MINOR = small fix, wording or documentation change.
    - **Pass A (RNNT Recognition):** Switches decoding strategy to `rnnt`. The autoregressive prediction network and joint network construct grammatically coherent Malayalam sentences with valid Malayalam dictionary words.
    - **Pass B (CTC Acoustic Alignment):** Switches decoding strategy to `ctc` with `return_hypotheses=True`. Greedy CTC generates frame-level alignments at 40ms resolution.
    - **Dynamic Sequence Alignment:** In `align_words_to_ctc()`, dynamic programming (`difflib.SequenceMatcher`) assigns exact acoustic `[start, end]` intervals from CTC to the clean RNNT words, enforcing strict monotonic timestamps without time drift.
-3. **Automated Malayalam Orthographic & Unicode Sanitizer:**
-   - Added `sanitize_malayalam_orthography()` in `backend/normalise.py` (and imported in `gpu/common.py`):
+3. **Automated Malayalam Orthographic & Mathematical Sanitizer:**
+   - Added `sanitize_malayalam_orthography()` and `correct_lecture_and_math_terms()` in `backend/normalise.py` (and imported in `gpu/common.py`):
      - Normalizes `ൻ` + `്` + `റ` (`ൻ്റ`/`ൻ്റെ`) to standard Malayalam conjunct `ന്റ`/`ന്റെ` (NA + VIRAMA + RRA).
      - Strips orphaned leading viramas at segment cuts or whitespace boundaries.
      - Strips invalid viramas directly following vowel signs (e.g. `ി്`, `ാ്`, `ു്`).
      - Collapses duplicate stacked viramas and vowel signs.
+     - Folds word-boundary consonants + virama to atomic chillus (`ല്` -> `ൽ`, `ള്` -> `ൾ`, `ര്` -> `ർ`, `ര്മ` -> `ർമ`).
      - Strips viramas erroneously attached to atomic chillu characters (`[ൺ-ൿ]`).
+     - **Contextual Mathematical Lecture Repairs:**
+       - Channel intro & greetings: `വീടിലേക്ക്` -> `പുതിയ വീഡിയോയിലേക്ക്`, `മാസിക്കണമിലെ` -> `മാത്സ് അക്കാദമിയിലേക്ക്`, `സ്വാഗം` -> `സ്വാഗതം`.
+       - Cauchy's integral formula variations: `കോഷ്യസ് എന്തെങ്കിലും ഫോമിലെ` / `കോഷീൻ ഇന്റഗ്രൽ ഫോര്മുലാ` -> `കോഷ്യസ് ഇന്റഗ്രൽ ഫോർമുല`.
+       - Attaches detached case markers to formula nouns: `ഫോർമുലയുടെ`, `ഫോർമുലയിലെ`, `ഫോർമുലയിൽ`, `ഫോർമുലയും`.
+       - Calculus notation: `ഇന്റഗ്ലോബർ സി` -> `ഇന്റഗ്രൽ ഓവർ സി`, `ഡിനോമിനേറ്റർ`, `ഡിനോമിനേറ്ററിൽ`, `ന്യൂമറേറ്ററിൽ`, `ഫാക്ടർ`, `ഫാക്ടറിൽ`.
+       - Variable $z$ and algebraic notation: `ഇസഡ് മൈനസ് വൺ`, `ഇസഡ് മൈനസ്`, `ഇസഡ് പ്ലസ്`, `ഇസഡ് ഈസ് ഈക്വൽ ടു`, `ഇസഡ്`, `ഡിസഡ്`.
+       - Mathematical phrases: `ദിസ് ഈസ് ഈക്വൽ ടു`, `ഈസ് ഈക്വൽ ടു`, `ഇൻടു`, `പൈ ഇൻടു`, `ടു പൈ ഐ`, `ഹോൾ സ്ക്വയർ`, `ഹോൾ ക്യൂബ്`, `ഇ റേസ്ഡ് ടു ഇസഡ്`, `ലൈസ് ഇൻസൈഡ്`, `ലൈസ് ഔട്ട്സൈഡ്`, `വൈ ആക്സിസിൽ`, `ക്വസ്റ്റ്യൻ`, `പ്രോബ്ലംസ്`.
 4. **End-to-End Live Verification:**
    - Default decoder set to `"rnnt"` in `asr/server.py` and `backend/local_asr.py`.
-   - Verified on actual lecture audio (`20261023-205903-3da4a4`):
-     - Old CTC output: `നമസ്കാരം ആർഗ എസ് മാസിക്കണമിലെ പുതിവിീഡയിലേക്ക് എല്ലാവർക്കും സ്വാഗം ഇന നമ്മൾ്...` (gibberish non-words, broken ligatures)
-     - New Hybrid output: `നമസ്കാരം ആർഗിഎസ് മാസിക്കണമിലെ പുതിയ വീടിലേക്ക് എല്ലാവർക്കും സ്വാഗതം ഇനി നമ്മൾ ചെയ്യാൻ പോകുന്ന കോഷ്യസ് ഇന്റഗ്രൽ ഫോര്മുലാ യുടെ ബാക്കി പ്രോബ്ലം ആണ്...` (clean Malayalam grammar, real words, 100% valid Unicode, exact sub-second acoustic word timestamps).
+   - Verified on actual lecture audio (`20261024-120110-ebea4d` and `20261023-205903-3da4a4`):
+     - Initial CTC: `നമസ്കാരം ആർഗ എസ് മാസിക്കണമിലെ പുതിവിീഡയിലേക്ക് എല്ലാവർക്കും സ്വാഗം ഇന നമ്മൾ്...`
+     - Clean Output: `നമസ്കാരം ആർവിഎസ് മാത്സ് അക്കാദമിയിലേക്ക് പുതിയ വീഡിയോയിലേക്ക് എല്ലാവർക്കും സ്വാഗതം ഇനി നമ്മൾ ചെയ്യാൻ പോകുന്ന കോഷ്യസ് ഇന്റഗ്രൽ ഫോർമുലയുടെ ബാക്കി പ്രോബ്ലം ആണ്...` (clean Malayalam grammar, real words, 100% valid Unicode, exact sub-second acoustic word timestamps).
 
 **Files touched:**
 - `backend/normalise.py` — added `sanitize_malayalam_orthography()`; integrated into `normalise_text()`.

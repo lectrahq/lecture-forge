@@ -595,12 +595,13 @@ function ConfirmDeleteModal({ job, onConfirm, onCancel, deleting }) {
           <ul className="modal-bullet-list">
             <li>The 16 kHz uncompressed audio file and raw downloads</li>
             <li>All generated transcripts, word timestamps, and silence alignments</li>
-            {isLocal && (
-              <li>
-                <strong>Local model time counter:</strong> All elapsed audio seconds and processing runtime added by this lecture will be completely removed from the cumulative counter.
-              </li>
-            )}
+            <li>
+              <strong>Local model time counter:</strong> All elapsed audio seconds and processing runtime added by this lecture will be completely removed from the cumulative counter.
+            </li>
             <li>All segment audio clips and database records</li>
+            <li>
+              <strong>Dictionary &amp; Datasets:</strong> All vocabulary entries, approved and unapproved transliterations, candidate proposals, and acoustic health telemetry contributed by this lecture will be completely purged across all tabs.
+            </li>
           </ul>
           <p className="muted small" style={{ marginTop: 14 }}>
             It will be as if this lecture was never given to the server.
@@ -745,6 +746,9 @@ export default function App() {
         setJob(null);
         setTranscript(null);
         setComparison(null);
+        setAudioIsPlaying(false);
+        setAudioSeekRequest(null);
+        setAudioTogglePlayTrigger(0);
         navigateToTab("library");
       }
       refreshJobs();
@@ -1782,12 +1786,12 @@ function JobStatus({
           )}
         </div>
 
-        {isLocalJob && (job.status === "done" || job.status === "failed") && (
+        {(job.status === "done" || job.status === "failed") && (
           <button
             type="button"
             className="delete-lecture-btn"
             onClick={() => onDeleteRequest && onDeleteRequest(job)}
-            title="Permanently delete all audio, transcripts, and model time records for this lecture"
+            title="Permanently delete all audio, transcripts, and records for this lecture"
           >
             <IconTrash /> Delete Lecture
           </button>
@@ -3025,12 +3029,12 @@ function JobList({ jobs, currentId, onOpen, onDeleteRequest, empty }) {
                     </span>
                   )}
                   <span className={`badge ${j.status}`}>{STAGE_LABELS[j.status] || j.status}</span>
-                  {(j.engine === "local" || j.engine === "both" || j.local_seconds != null) && (j.status === "done" || j.status === "failed") && (
+                  {(j.status === "done" || j.status === "failed") && (
                     <span
                       role="button"
                       tabIndex={0}
                       className="job-card-delete-btn"
-                      title="Permanently delete this local transcription from the server"
+                      title="Permanently delete this lecture from the server"
                       onClick={(e) => {
                         e.stopPropagation();
                         if (onDeleteRequest) onDeleteRequest(j);

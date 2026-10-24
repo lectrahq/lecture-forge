@@ -15,6 +15,7 @@ Everything a job produces is written to data/<job_id>/:
     segments.json      clip start/end/text (for the website)
 """
 
+from collections import Counter
 import io
 import json
 import logging
@@ -789,9 +790,73 @@ def get_job(job_id: str):
     return public_job(get_job_or_404(job_id))
 
 
+def purge_job_from_dictionary(job_id: str) -> None:
+    """Purge all dictionary and vocabulary data that originated from this job.
+
+    Recalculates word counts across all remaining done jobs. Any dictionary
+    entries (words, spellings, candidates, status) that were only present because
+    of this job and have 0 occurrences across remaining jobs are completely
+    expunged from english_map.json.
+    """
+    if not os.path.isfile(ENGLISH_MAP_PATH):
+        return
+
+    try:
+        with open(ENGLISH_MAP_PATH, encoding="utf-8") as f:
+            data = json.load(f)
+    except Exception as e:
+        log.warning("Could not read %s for purge: %s", ENGLISH_MAP_PATH, e)
+        return
+
+    latin_pattern = re.compile(r"[A-Za-z]+")
+    new_counts: Counter = Counter()
+
+    for other_job in db.list_jobs():
+        if other_job["id"] == job_id or other_job["status"] != "done":
+            continue
+        t_path = os.path.join(job_dir(other_job["id"]), "transcript.json")
+        if not os.path.isfile(t_path):
+            continue
+        try:
+            with open(t_path, encoding="utf-8") as tf:
+                t_data = json.load(tf)
+            for item in t_data.get("words") or []:
+                if item.get("type") != "word":
+                    continue
+                w_text = unicodedata.normalize("NFC", item.get("text") or "")
+                for run in latin_pattern.findall(w_text):
+                    new_counts[run.lower()] += 1
+        except Exception:
+            pass
+
+    data["counts"] = dict(new_counts.most_common())
+
+    mapping = data.get("map", {})
+    status = data.get("status", {})
+    candidates = data.get("candidates", {})
+    source = data.get("source", {})
+
+    all_keys = set(mapping.keys()) | set(status.keys()) | set(candidates.keys())
+    for w in list(all_keys):
+        if w not in new_counts:
+            mapping.pop(w, None)
+            status.pop(w, None)
+            candidates.pop(w, None)
+            source.pop(w, None)
+
+    try:
+        with open(ENGLISH_MAP_PATH, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=1, sort_keys=True)
+        log.info("[%s] purged dictionary data; updated %s (remaining active words: %d)",
+                 job_id, ENGLISH_MAP_PATH, len(data.get("counts", {})))
+    except Exception as e:
+        log.warning("Could not save updated %s: %s", ENGLISH_MAP_PATH, e)
+
+
 @app.delete("/api/jobs/{job_id}")
 def delete_job_endpoint(job_id: str):
-    """Permanently delete a job, all its audio files, transcripts, clips, and DB records.
+    """Permanently delete a job, all its audio files, transcripts, clips, DB records,
+    and purge any dictionary words and time tracking counters added by this lecture.
 
     Only jobs in 'done' or 'failed' status can be deleted to prevent interrupting
     active worker processes. Deleting the record automatically removes its time from
@@ -804,7 +869,10 @@ def delete_job_endpoint(job_id: str):
             detail=f"Cannot delete job while it is in '{job['status']}' state. Please wait until it completes or fails."
         )
 
-    # 1. Remove all files from data/<job_id>
+    # 1. Purge dictionary data derived from this lecture
+    purge_job_from_dictionary(job_id)
+
+    # 2. Remove all files from data/<job_id>
     folder = job_dir(job_id)
     if os.path.exists(folder):
         try:
@@ -812,15 +880,16 @@ def delete_job_endpoint(job_id: str):
         except Exception as e:
             log.warning("[%s] error removing directory %s: %s", job_id, folder, e)
 
-    # 2. Clear progress file if any
+    # 3. Clear progress file if any
     clear_progress(job_id)
 
-    # 3. Invalidate word samples cache so deleted job samples are not served
+    # 4. Invalidate word samples cache and credit cache so deleted data is not served
     _word_samples_cache["indexed_at"] = 0.0
+    _credit_cache["checked_at"] = 0.0
 
-    # 4. Remove database record
+    # 5. Remove database record
     db.delete_job(job_id)
-    log.info("[%s] permanently deleted job and all server data", job_id)
+    log.info("[%s] permanently deleted job and all server data across all tabs", job_id)
     return {"ok": True, "job_id": job_id, "deleted": True}
 
 

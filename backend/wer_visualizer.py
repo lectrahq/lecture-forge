@@ -238,6 +238,87 @@ COMMON_LOANWORDS = {
     "capital": ["ക്യാപിറ്റൽ"],
     "number": ["നമ്പർ"],
 
+    # Trigonometric, Hyperbolic & Logarithmic Functions
+    "sin": ["സൈൻ", "സൈനിന്റെ", "സൈൻസിന്"],
+    "cos": ["കോസ്", "കോസിന്റെ", "കോസിന്"],
+    "tan": ["ടാൻ", "ടാനിന്റെ", "ടാനിന്"],
+    "sec": ["സെക്", "സെക്കിന്റെ", "സെക്കിന്"],
+    "cosec": ["കൊസീക്", "കൊസെക്", "കൊസീക്കിന്റെ"],
+    "cot": ["കോട്ട്", "കോട്ടിന്റെ", "കോട്ടിന്"],
+    "sinh": ["സൈൻഎച്ച്", "സൈൻ എച്ച്"],
+    "cosh": ["കോസ്എച്ച്", "കോസ് എച്ച്"],
+    "tanh": ["ടാൻഎച്ച്", "ടാൻ എച്ച്"],
+    "log": ["ലോഗ്", "ലോഗിന്റെ", "ലോഗിന്", "ലോഗു"],
+    "ln": ["എൽഎൻ", "എൽ എൻ"],
+    "exp": ["ഇഎക്സ്പി", "ഇ എക്സ് പി"],
+    "exponential": ["എക്സ്പോണൻഷ്യൽ", "എക്സ്പൊണൻഷ്യൽ"],
+    "raise": ["റേസ്", "റൈസ്"],
+    "raised": ["റേസ്ഡ്", "റൈസ്ഡ്"],
+
+    # Complex Analysis & Geometry Keywords
+    "set": ["സെറ്റ്", "സെറ്റിന്റെ", "സെറ്റുകൾ"],
+    "subset": ["സബ്സെറ്റ്", "സബ്സെറ്റിന്റെ"],
+    "plane": ["പ്ലെയ്ൻ", "പ്ലെയിൻ", "പ്ലേൻ", "പ്ലെയ്നിന്റെ"],
+    "axis": ["ആക്സിസ്", "ആക്സിസിന്റെ"],
+    "axes": ["ആക്സസ്"],
+    "real": ["റിയൽ"],
+    "imaginary": ["ഇമാജിനറി"],
+    "polar": ["പോളാർ"],
+    "radius": ["റേഡിയസ്", "റേഡിയസിന്റെ"],
+    "region": ["റീജിയൻ", "റീജിയൺ", "റീജിയന്റെ"],
+    "domain": ["ഡൊമൈൻ", "ഡൊമെയിൻ", "ഡൊമൈന്റെ"],
+    "path": ["പാത്ത്", "പാത്തിന്റെ"],
+    "contour": ["കോണ്ടൂർ", "കോണ്ടൂർസ്"],
+    "closed": ["ക്ലോസ്ഡ്"],
+    "open": ["ഓപ്പൺ"],
+    "connected": ["കണക്റ്റഡ്", "കണക്റ്റഡാണ്"],
+    "simply": ["സിംപ്ലി"],
+
+    # Mathematical Actions, Terms & Operations
+    "term": ["ടേം"],
+    "terms": ["ടേംസ്"],
+    "bracket": ["ബ്രാക്കറ്റ്", "ബ്രാക്കറ്റിൽ"],
+    "brackets": ["ബ്രാക്കറ്റ്സ്", "ബ്രാക്കറ്റുകൾ"],
+    "numerator": ["ന്യൂമറേറ്റർ", "ന്യൂമറേറ്ററിൽ"],
+    "denominator": ["ഡിനോമിനേറ്റർ", "ഡിനോമിനേറ്ററിൽ"],
+    "multiply": ["മൾട്ടിപ്ലൈ"],
+    "multiplied": ["മൾട്ടിപ്ലൈഡ്"],
+    "multiplication": ["മൾട്ടിപ്ലിക്കേഷൻ"],
+    "divide": ["ഡിവൈഡ്"],
+    "divided": ["ഡിവൈഡഡ്"],
+    "division": ["ഡിവിഷൻ"],
+    "cancel": ["കാൻസൽ"],
+    "cancelled": ["കാൻസൽഡ്"],
+    "cancelling": ["കാൻസലിങ്", "കാൻസലിംഗ്"],
+    "put": ["പുട്ട്"],
+    "putting": ["പുട്ടിങ്", "പുട്ടിംഗ്"],
+    "take": ["ടേക്ക്"],
+    "taking": ["ടേക്കിങ്", "ടേക്കിംഗ്"],
+    "get": ["ഗെറ്റ്"],
+    "getting": ["ഗെറ്റിങ്", "ഗെറ്റിംഗ്"],
+    "give": ["ഗിവ്"],
+    "gives": ["ഗിവ്സ്"],
+    "giving": ["ഗിവിങ്", "ഗിവിംഗ്"],
+    "becomes": ["ബികംസ്"],
+    "show": ["ഷോ"],
+    "showing": ["ഷോയിങ്", "ഷോയിംഗ്"],
+    "prove": ["പ്രൂവ്"],
+    "proof": ["പ്രൂഫ്"],
+    "define": ["ഡിഫൈൻ"],
+    "definition": ["ഡെഫിനിഷൻ"],
+    "state": ["സ്റ്റേറ്റ്"],
+    "statement": ["സ്റ്റേറ്റ്മെന്റ്"],
+    "known": ["നോൺ"],
+    "unknown": ["അൺനോൺ"],
+    "given": ["ഗിവൺ"],
+    "required": ["റിക്വയർഡ്"],
+    "find": ["ഫൈൻഡ്"],
+    "finding": ["ഫൈൻഡിങ്", "ഫൈൻഡിംഗ്"],
+    "calculate": ["കാൽക്കുലേറ്റ്"],
+    "calculation": ["കാൽക്കുലേഷൻ"],
+    "calculating": ["കാൽക്കുലേറ്റിങ്", "കാൽക്കുലേറ്റിംഗ്"],
+    "calculator": ["കാൽക്കുലേറ്റർ"],
+
     # Math Calculus Actions & Greek Symbols
     "equal": ["ഈക്വൽ"],
     "equals": ["ഈക്വൽസ്"],
@@ -337,7 +418,7 @@ COMMON_LOANWORDS = {
     "c": ["സി", "സീ"],
     "e": ["ഇ", "ഈ"],
     "i": ["ഐ", "ആയി", "ഇ"],
-    "z": ["ഇസഡ്", "ഡി", "സെഡ്", "ഇസറ്"],
+    "z": ["ഇസഡ്", "ഡി", "സെഡ്", "ഇസറ്", "സെറ്റ്"],
     "x": ["എക്സ്"],
     "y": ["വൈ"],
     "d": ["ഡി"],
@@ -1140,13 +1221,13 @@ def get_or_create_wer_analytics(folder: str, segments: list[dict], mapping: dict
             with open(cache_path, encoding="utf-8") as f:
                 data = json.load(f)
                 # Verify schema version
-                if data.get("schema_version") == 3:
+                if data.get("schema_version") == 4:
                     return data
         except Exception as e:
             log.warning("Could not load cached wer_analytics from %s: %s", cache_path, e)
 
     analytics = compute_comparison_analytics(segments, mapping)
-    analytics["schema_version"] = 3
+    analytics["schema_version"] = 4
     analytics["mapping_count"] = len(mapping)
     try:
         with open(cache_path, "w", encoding="utf-8") as f:

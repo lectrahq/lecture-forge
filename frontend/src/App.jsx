@@ -24,11 +24,13 @@ import {
   bulkApproveSpellings,
   deleteJob,
   streamAudioUrl,
+  triggerLocalComparison,
   uploadFile,
 } from "./api.js";
 import { THEMES, applyTheme, loadTheme, saveTheme } from "./theme.js";
 import { WaveformScrubber } from "./WaveformScrubber.jsx";
 import { ClassroomRecorder } from "./ClassroomRecorder.jsx";
+import WerHeatmap from "./WerHeatmap.jsx";
 
 const POLL_MS = 3000;
 const FINAL = ["done", "failed"];
@@ -651,6 +653,8 @@ export default function App() {
   const [audioTogglePlayTrigger, setAudioTogglePlayTrigger] = useState(0);
   const [jobToDelete, setJobToDelete] = useState(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [refreshingComparison, setRefreshingComparison] = useState(false);
+  const [startingComparison, setStartingComparison] = useState(false);
 
   // Sync with browser back/forward buttons
   useEffect(() => {
@@ -697,6 +701,37 @@ export default function App() {
     listJobs().then(setJobs).catch(() => {});
     getUsage().then(setUsage).catch(() => {});
   }, []);
+
+  const handleRefreshComparison = useCallback(async () => {
+    if (!currentId) return;
+    setRefreshingComparison(true);
+    try {
+      const c = await getComparison(currentId, true);
+      setComparison(c);
+    } catch (e) {
+      console.error("Failed to recompute comparison:", e);
+    } finally {
+      setRefreshingComparison(false);
+    }
+  }, [currentId]);
+
+  const handleStartLocalComparison = useCallback(async () => {
+    if (!currentId) return;
+    setStartingComparison(true);
+    try {
+      await triggerLocalComparison(currentId);
+      setTimeout(async () => {
+        try {
+          const c = await getComparison(currentId);
+          setComparison(c);
+        } catch {}
+        setStartingComparison(false);
+      }, 2500);
+    } catch (e) {
+      console.error("Failed to start local comparison:", e);
+      setStartingComparison(false);
+    }
+  }, [currentId]);
 
   const handleDeleteConfirm = useCallback(async () => {
     if (!jobToDelete) return;
@@ -880,6 +915,10 @@ export default function App() {
                     isPlaying={audioIsPlaying}
                     onSeek={handleAudioSeek}
                     onTogglePlay={handleAudioTogglePlay}
+                    onRefreshComparison={handleRefreshComparison}
+                    refreshingComparison={refreshingComparison}
+                    onStartLocalComparison={handleStartLocalComparison}
+                    startingComparison={startingComparison}
                     onUpdated={() => {
                       if (currentId) {
                         getTranscript(currentId).then(setTranscript).catch(() => {});
@@ -2700,6 +2739,10 @@ function TranscriptView({
   isPlaying = false,
   onSeek,
   onTogglePlay,
+  onRefreshComparison,
+  refreshingComparison,
+  onStartLocalComparison,
+  startingComparison,
 }) {
   const isLocal = transcript.source === "local";
 
@@ -2710,7 +2753,7 @@ function TranscriptView({
         note={transcript.language_code}
         text={transcript.text}
         words={transcript.words || []}
-        jobId={job?.job_id}
+        jobId={job?.job_id || job?.id}
         isPlaying={isPlaying}
         onSeek={onSeek}
         onTogglePlay={onTogglePlay}
@@ -2723,7 +2766,7 @@ function TranscriptView({
           title="Transcript (local model)"
           text={transcript.local_text}
           words={transcript.local_words || []}
-          jobId={job?.job_id}
+          jobId={job?.job_id || job?.id}
           isPlaying={isPlaying}
           onSeek={onSeek}
           onTogglePlay={onTogglePlay}
@@ -2731,7 +2774,37 @@ function TranscriptView({
         />
       )}
 
-      {comparison && <ComparisonTable comparison={comparison} jobId={job.id} />}
+      {comparison ? (
+        <WerHeatmap
+          comparison={comparison}
+          jobId={job?.job_id || job?.id}
+          onRefresh={onRefreshComparison}
+          refreshing={refreshingComparison}
+        />
+      ) : (
+        job?.status === "done" && job?.engine !== "local" && (
+          <div className="start-comparison-card">
+            <div className="start-comparison-content">
+              <div>
+                <h4>Compare with Local IndicConformer ASR</h4>
+                <p>
+                  Run the local AI4Bharat IndicConformer model across this lecture to generate
+                  a visual Word Error Rate (WER) heatmap, character edit metrics, and technical
+                  out-of-vocabulary error breakdown.
+                </p>
+              </div>
+              <button
+                type="button"
+                className="btn primary-btn"
+                onClick={onStartLocalComparison}
+                disabled={startingComparison}
+              >
+                {startingComparison ? "Starting Comparison…" : "Run Local Model Comparison"}
+              </button>
+            </div>
+          </div>
+        )
+      )}
 
       {transcript.segments.length > 0 && (
         <SegmentEditorAndPlayer
@@ -2744,244 +2817,8 @@ function TranscriptView({
   );
 }
 
-function ComparisonTable({ comparison, jobId }) {
-  const { overall, comparable, segments } = comparison;
-  const [filter, setFilter] = useState("all");
-  const [search, setSearch] = useState("");
-  const audioRef = useRef(null);
-  const [playingSnippet, setPlayingSnippet] = useState(null);
-
-  useEffect(() => {
-    return () => {
-      if (audioRef.current) {
-        audioRef.current.pause();
-        audioRef.current = null;
-      }
-    };
-  }, []);
-
-  const playSegment = useCallback((start, end) => {
-    if (!jobId) return;
-    const key = `${start}-${end}`;
-    if (audioRef.current) {
-      audioRef.current.pause();
-      if (playingSnippet === key) {
-        audioRef.current = null;
-        setPlayingSnippet(null);
-        return;
-      }
-    }
-    const url = audioSnippetUrl(jobId, start, end);
-    const audio = new Audio(url);
-    audioRef.current = audio;
-    setPlayingSnippet(key);
-    audio.onended = () => {
-      if (audioRef.current === audio) setPlayingSnippet(null);
-    };
-    audio.onerror = () => {
-      if (audioRef.current === audio) setPlayingSnippet(null);
-    };
-    audio.play().catch(() => setPlayingSnippet(null));
-  }, [jobId, playingSnippet]);
-
-  const stats = useMemo(() => {
-    let matched = 0;
-    let disagreed = 0;
-    segments.forEach((s) => {
-      const w = s.scores?.wer;
-      if (w === 0) matched++;
-      else if (w > 0) disagreed++;
-    });
-    return { matched, disagreed, total: segments.length };
-  }, [segments]);
-
-  const filtered = useMemo(() => {
-    return segments
-      .map((s, idx) => ({ ...s, origIdx: idx }))
-      .filter((s) => {
-        const w = s.scores?.wer;
-        if (filter === "disagreed" && (w == null || w === 0)) return false;
-        if (filter === "matched" && w !== 0) return false;
-        if (search.trim()) {
-          const q = search.toLowerCase();
-          return (s.elevenlabs || "").toLowerCase().includes(q) || (s.local || "").toLowerCase().includes(q);
-        }
-        return true;
-      });
-  }, [segments, filter, search]);
-
-  return (
-    <div className="comparison">
-      <h3>ElevenLabs vs IndicConformer Comparison</h3>
-
-      {comparable ? (
-        <>
-          <div className="compare-scorecards">
-            <div className="compare-scorecard">
-              <span className="compare-scorecard-label">Overall Agreement</span>
-              <span className="compare-scorecard-value" style={{ color: "var(--ok)" }}>
-                {((1 - overall.wer) * 100).toFixed(1)}%
-              </span>
-            </div>
-            <div className="compare-scorecard">
-              <span className="compare-scorecard-label">Word Disagreement (WER)</span>
-              <span className="compare-scorecard-value" style={{ color: "var(--warn)" }}>
-                {(overall.wer * 100).toFixed(1)}%
-              </span>
-            </div>
-            <div className="compare-scorecard">
-              <span className="compare-scorecard-label">Character Error (CER)</span>
-              <span className="compare-scorecard-value">
-                {(overall.cer * 100).toFixed(1)}%
-              </span>
-            </div>
-            <div className="compare-scorecard">
-              <span className="compare-scorecard-label">Segments Compared</span>
-              <span className="compare-scorecard-value">
-                {segments.length}
-              </span>
-            </div>
-          </div>
-
-          <div className="compare-filter-bar">
-            <div className="tabs" role="tablist" style={{ marginBottom: 0 }}>
-              <button
-                type="button"
-                className={filter === "all" ? "tab active" : "tab"}
-                onClick={() => setFilter("all")}
-              >
-                All ({stats.total})
-              </button>
-              <button
-                type="button"
-                className={filter === "disagreed" ? "tab active" : "tab"}
-                onClick={() => setFilter("disagreed")}
-              >
-                Discrepancies ({stats.disagreed})
-              </button>
-              <button
-                type="button"
-                className={filter === "matched" ? "tab active" : "tab"}
-                onClick={() => setFilter("matched")}
-              >
-                Exact Matches ({stats.matched})
-              </button>
-            </div>
-
-            {segments.length > 5 && (
-              <div className="search-input-wrap" style={{ maxWidth: 280 }}>
-                <input
-                  type="text"
-                  placeholder="Filter comparison words…"
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                />
-                {search && (
-                  <button type="button" className="search-clear-btn" onClick={() => setSearch("")} title="Clear filter">
-                    <IconX />
-                  </button>
-                )}
-              </div>
-            )}
-          </div>
-        </>
-      ) : (
-        <div className="warn-box" style={{ margin: "12px 0 16px" }}>
-          <strong>These scores are not meaningful yet.</strong> The local model writes English
-          words in Malayalam letters while ElevenLabs keeps them in English, so roughly 40% of
-          words differ on spelling alone rather than on what was heard. Fill in the English
-          spelling table first (<code>build_english_map.py --fill</code>), then the numbers will
-          compare the models rather than the alphabets.
-        </div>
-      )}
-
-      {/* Desktop Table View */}
-      <div className="scroll desktop-table-view">
-        <table className="segments compare">
-          <thead>
-            <tr>
-              <th>#</th>
-              <th>Time</th>
-              <th>ElevenLabs (Transliterated)</th>
-              <th>Local IndicConformer</th>
-              {comparable && <th>WER</th>}
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.map((s) => (
-              <tr key={s.origIdx}>
-                <td className="num">{s.origIdx + 1}</td>
-                <td className="time">
-                  {formatPrecise(s.start)} – {formatPrecise(s.end)}
-                  {jobId && (
-                    <button
-                      type="button"
-                      className={`compare-audio-btn ${playingSnippet === `${s.start}-${s.end}` ? "playing" : ""}`}
-                      onClick={() => playSegment(s.start, s.end)}
-                      title="Play segment audio"
-                    >
-                      <IconVolume />
-                    </button>
-                  )}
-                </td>
-                <td>{s.elevenlabs}</td>
-                <td className="ml">{s.local || <em className="muted">(nothing)</em>}</td>
-                {comparable && (
-                  <td className="time">
-                    {s.scores.wer == null ? (
-                      "–"
-                    ) : s.scores.wer === 0 ? (
-                      <span className="badge done" style={{ fontSize: "0.75rem", padding: "1px 6px" }}>0% Match</span>
-                    ) : (
-                      <span className="badge" style={{ fontSize: "0.75rem", padding: "1px 6px" }}>
-                        {(s.scores.wer * 100).toFixed(0)}%
-                      </span>
-                    )}
-                  </td>
-                )}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      {/* Mobile Card View (optimized for thumb scrolling on phones) */}
-      <div className="compare-mobile-cards">
-        {filtered.map((s) => (
-          <div key={s.origIdx} className="compare-card-item">
-            <div className="compare-card-meta">
-              <span>
-                #{s.origIdx + 1} · {formatPrecise(s.start)} – {formatPrecise(s.end)}
-                {jobId && (
-                  <button
-                    type="button"
-                    className={`compare-audio-btn ${playingSnippet === `${s.start}-${s.end}` ? "playing" : ""}`}
-                    onClick={() => playSegment(s.start, s.end)}
-                    title="Play segment audio"
-                  >
-                    <IconVolume />
-                  </button>
-                )}
-              </span>
-              {comparable && s.scores.wer != null && (
-                <span className={s.scores.wer === 0 ? "badge done" : "badge"}>
-                  {s.scores.wer === 0 ? "✓ 100% Match" : `${(s.scores.wer * 100).toFixed(0)}% Discrepancy`}
-                </span>
-              )}
-            </div>
-            <div className="compare-card-row">
-              <span className="compare-card-label">ElevenLabs Reference:</span>
-              <div className="compare-card-text">{s.elevenlabs}</div>
-            </div>
-            <div className="compare-card-row">
-              <span className="compare-card-label">IndicConformer Prediction:</span>
-              <div className="compare-card-text ml">{s.local || <em className="muted">(nothing)</em>}</div>
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
+function ComparisonTable(props) {
+  return <WerHeatmap {...props} />;
 }
 
 // --- Job Library & Datasets ---

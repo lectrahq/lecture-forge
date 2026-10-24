@@ -52,6 +52,7 @@ from export_dataset import (create_dataset_archive, export_dataset,  # noqa: E40
                             get_dataset_summary, list_datasets)
 from audio_health import get_cached_health  # noqa: E402
 from waveform import get_or_create_waveform  # noqa: E402
+from wer_visualizer import get_or_create_wer_analytics  # noqa: E402
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 log = logging.getLogger("jobs")
@@ -859,8 +860,8 @@ def promote_to_training(job_id: str):
 
 
 @app.get("/api/jobs/{job_id}/comparison")
-def get_comparison(job_id: str):
-    """ElevenLabs vs the local model, piece by piece, with scores.
+def get_comparison(job_id: str, recompute: bool = False):
+    """ElevenLabs vs the local model, piece by piece, with scores and visual WER/CER heatmap.
 
     The two write English differently - ElevenLabs keeps Latin letters, the local
     model spells English words in Malayalam script - so the texts are put through
@@ -870,7 +871,8 @@ def get_comparison(job_id: str):
     says whether it is meaningful yet.
     """
     get_job_or_404(job_id)
-    path = os.path.join(job_dir(job_id), "local_segments.json")
+    folder = job_dir(job_id)
+    path = os.path.join(folder, "local_segments.json")
     if not os.path.isfile(path):
         raise HTTPException(status_code=404, detail="This job has no local-model comparison.")
     with open(path, encoding="utf-8") as f:
@@ -880,21 +882,23 @@ def get_comparison(job_id: str):
     if os.path.isfile(ENGLISH_MAP_PATH):
         mapping = load_english_map(ENGLISH_MAP_PATH)
 
-    out, references, predictions = [], [], []
-    for row in rows:
-        reference, _ = prepare_reference(row["elevenlabs"], mapping)
-        prediction = normalise_text(row["local"])
-        references.append(reference)
-        predictions.append(prediction)
-        out.append({**row, "scores": score_pair(reference, prediction)})
-
     coverage = map_coverage(ENGLISH_MAP_PATH, read_english_map().get("counts", {})) \
         if os.path.isfile(ENGLISH_MAP_PATH) else {"coverage_percent": 0.0}
 
+    # Run / load full token-level sequence alignment, WER/CER heatmap and OOV error breakdown
+    analytics = get_or_create_wer_analytics(folder, rows, mapping, recompute=recompute)
+
     return {
         "job_id": job_id,
-        "segments": out,
-        "overall": score_pair(" ".join(references), " ".join(predictions)),
+        "segments": analytics["enriched_segments"],
+        "overall": {
+            "wer": analytics["metrics"]["overall_wer"],
+            "cer": analytics["metrics"]["overall_cer"],
+            "agreement": analytics["metrics"]["overall_agreement"],
+        },
+        "metrics": analytics["metrics"],
+        "heatmap_ribbon": analytics["heatmap_ribbon"],
+        "oov_heatmap": analytics["oov_heatmap"],
         "english_map_words": len(mapping),
         "coverage": coverage,
         # Below this, the number says more about alphabets than about recognition,
@@ -904,6 +908,37 @@ def get_comparison(job_id: str):
         "note": "Scores show agreement with ElevenLabs, not accuracy. "
                 "ElevenLabs has its own mistakes.",
     }
+
+
+@app.post("/api/jobs/{job_id}/compare-local")
+def api_trigger_local_comparison(job_id: str):
+    """Run local IndicConformer model over existing segments to generate comparison and heatmap."""
+    job = get_job_or_404(job_id)
+    if job["status"] not in ("done", "failed"):
+        raise HTTPException(status_code=409, detail=f"Job is currently {job['status']}.")
+
+    folder = job_dir(job_id)
+    wav_path = os.path.join(folder, "audio.wav")
+    seg_file = os.path.join(folder, "segments.json")
+    if not os.path.isfile(wav_path):
+        raise HTTPException(status_code=404, detail="Audio file missing for this job.")
+    if not os.path.isfile(seg_file):
+        raise HTTPException(status_code=404, detail="Job has no segments to compare.")
+
+    with open(seg_file, encoding="utf-8") as f:
+        segments = json.load(f)
+
+    def _worker():
+        try:
+            run_local_on_segments(job_id, folder, wav_path, segments, keep_clips=(job["purpose"] == "training"))
+            db.update_job(job_id, status="done")
+        except Exception as e:
+            log.exception("[%s] local comparison failed: %s", job_id, e)
+            db.update_job(job_id, status="done")
+
+    t = threading.Thread(target=_worker, name=f"compare-{job_id}", daemon=True)
+    t.start()
+    return {"message": "Local model comparison started in background.", "job_id": job_id}
 
 
 def extract_wav_snippet(job_id: str, start_sec: float, end_sec: float) -> bytes:

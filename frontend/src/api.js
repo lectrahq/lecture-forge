@@ -55,8 +55,10 @@ export const deleteJob = (id) =>
   request(`/api/jobs/${encodeURIComponent(id)}`, { method: "DELETE" });
 export const getTranscript = (id) =>
   request(`/api/jobs/${encodeURIComponent(id)}/transcript`);
-export const getComparison = (id) =>
-  request(`/api/jobs/${encodeURIComponent(id)}/comparison`);
+export const getComparison = (id, recompute = false) =>
+  request(`/api/jobs/${encodeURIComponent(id)}/comparison${recompute ? "?recompute=true" : ""}`);
+export const triggerLocalComparison = (id) =>
+  request(`/api/jobs/${encodeURIComponent(id)}/compare-local`, { method: "POST" });
 export const getUsage = () => request("/api/usage");
 
 // purpose is "training" or "transcribe"; omit it for every job.

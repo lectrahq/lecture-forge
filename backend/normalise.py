@@ -67,11 +67,41 @@ def strip_punctuation(text: str) -> str:
     return "".join(" " if unicodedata.category(c).startswith("P") else c for c in text)
 
 
+def sanitize_malayalam_orthography(text: str) -> str:
+    """Clean Malayalam orthographic anomalies, broken ligatures, and non-standard conjuncts.
+
+    Automated repair without manual spelling correction:
+    1. Normalizes chillu-n + virama + rra ('ൻ്റ'/'ൻ്റെ') to standard conjunct ('ന്റ'/'ന്റെ' = NA + VIRAMA + RRA).
+    2. Strips orphaned leading viramas at start of words or string (boundary cut artifact).
+    3. Removes invalid viramas immediately following vowel signs (e.g. 'ി്', 'ാ്', 'ു്').
+    4. Collapses multiple consecutive viramas (e.g. 'സ്റ്റാർ്ടട്ട്' -> 'സ്റ്റാർട്ട').
+    5. Collapses duplicate consecutive vowel signs (e.g. 'ാാ' -> 'ാ').
+    6. Removes invalid viramas immediately attached to atomic chillu letters (ൺ, ൻ, ർ, ൽ, ൾ, ൿ).
+    """
+    if not text:
+        return ""
+    text = unicodedata.normalize("NFC", text)
+    # 1. Normalize chillu-n conjuncts
+    text = re.sub(r"\u0D7B[\u200C\u200D]?\u0D4D\u0D31", "\u0D28\u0D4D\u0D31", text)
+    # 2. Strip leading orphaned viramas at start of string or after whitespace
+    text = re.sub(r"(?:^|\s)[\u0D4D]+", " ", text)
+    # 3. Strip viramas immediately following any vowel signs
+    text = re.sub(r"([\u0D3E-\u0D4C\u0D57])[\u0D4D]+", r"\1", text)
+    # 4. Collapse multiple consecutive viramas
+    text = re.sub(r"[\u0D4D]{2,}", "\u0D4D", text)
+    # 5. Collapse duplicate consecutive vowel signs
+    text = re.sub(r"([\u0D3E-\u0D4C\u0D57])[\u0D3E-\u0D4C\u0D57]+", r"\1", text)
+    # 6. Remove virama immediately following atomic chillu characters
+    text = re.sub(r"([ൺ-ൿ])[\u0D4D]+", r"\1", text)
+    return _WHITESPACE.sub(" ", text).strip()
+
+
 def normalise_text(text: str) -> str:
     """The one normalisation applied to BOTH references and predictions."""
     if not text:
         return ""
     text = unicodedata.normalize("NFC", text)
+    text = sanitize_malayalam_orthography(text)
     text = fold_chillu(text)          # before stripping ZWJ, which chillu needs
     text = strip_invisible(text)
     text = strip_punctuation(text)

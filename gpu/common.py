@@ -8,6 +8,7 @@ compared. Malayalam chillu letters can be written two ways that look identical o
 screen, so without this a correct transcription can be counted as wrong.
 """
 
+import difflib
 import json
 import os
 import re
@@ -15,7 +16,7 @@ import sys
 import time
 from collections import defaultdict
 
-from normalise import normalise_text
+from normalise import normalise_text, sanitize_malayalam_orthography
 
 # A clip is named <job_id>_0007.wav, so the job (lecture) is the part before the
 # final _NNNN. Scores are reported per lecture as well as overall.
@@ -177,8 +178,8 @@ def checkpoint_path() -> str:
         ) from None
 
 
-def load_model(decoder: str = "ctc", checkpoint: str | None = None):
-    """Load IndicConformer and choose which decoder head to use ('ctc' or 'rnnt')."""
+def load_model(decoder: str = "rnnt", checkpoint: str | None = None):
+    """Load IndicConformer and choose which decoder head to use ('rnnt' or 'ctc')."""
     import nemo.collections.asr as nemo_asr
 
     device = torch_device()
@@ -202,10 +203,13 @@ def load_model(decoder: str = "ctc", checkpoint: str | None = None):
 
 def set_decoder(model, decoder: str) -> None:
     """Hybrid CTC-RNNT models carry two decoders; pick one before transcribing."""
+    if hasattr(model, "change_decoding_strategy"):
+        try:
+            model.change_decoding_strategy(decoder_type=decoder)
+        except Exception:
+            pass
     if hasattr(model, "cur_decoder"):
         model.cur_decoder = decoder
-    elif hasattr(model, "change_decoding_strategy"):
-        model.change_decoding_strategy(decoder_type=decoder)
 
 
 def transcribe(model, audio_paths: list[str], batch_size: int = 8,
@@ -253,7 +257,7 @@ def decode_ctc_words(ctc_hyp, tokenizer, language_id: str = "ml", frame_dur: flo
     alignments = getattr(ctc_hyp, "alignments", None)
     if alignments is None:
         text = getattr(ctc_hyp, "text", "")
-        return text, []
+        return sanitize_malayalam_orthography(text), []
 
     token_ids = alignments.argmax(dim=-1).tolist()
     blank_id = alignments.shape[-1] - 1
@@ -277,7 +281,7 @@ def decode_ctc_words(ctc_hyp, tokenizer, language_id: str = "ml", frame_dur: flo
         starts_with_space = tok_str.startswith(" ") or tok_str.startswith(" ")
 
         if (is_space_token or starts_with_space) and curr_pieces:
-            word_str = "".join(curr_pieces)
+            word_str = sanitize_malayalam_orthography("".join(curr_pieces))
             if word_str:
                 words.append({
                     "text": word_str,
@@ -295,7 +299,7 @@ def decode_ctc_words(ctc_hyp, tokenizer, language_id: str = "ml", frame_dur: flo
             last_t = t
 
     if curr_pieces:
-        word_str = "".join(curr_pieces)
+        word_str = sanitize_malayalam_orthography("".join(curr_pieces))
         if word_str:
             words.append({
                 "text": word_str,
@@ -304,41 +308,180 @@ def decode_ctc_words(ctc_hyp, tokenizer, language_id: str = "ml", frame_dur: flo
             })
 
     full_text = getattr(ctc_hyp, "text", " ".join(w["text"] for w in words)).strip()
-    return full_text, words
+    return sanitize_malayalam_orthography(full_text), words
+
+
+def align_words_to_ctc(rnnt_words: list[str], ctc_words: list[dict], duration: float | None = None) -> list[dict]:
+    """Align grammatically clean RNNT words to acoustic CTC word boundaries.
+
+    Uses dynamic programming sequence matching (difflib.SequenceMatcher) to associate
+    the autoregressive text recognition (RNNT) with acoustic frame boundaries (CTC),
+    preserving monotonic timestamps and preventing karaoke drift.
+    """
+    if not rnnt_words:
+        return []
+
+    # If CTC produced no words at all, fallback to linear spacing
+    if not ctc_words:
+        total_time = duration if (duration and duration > 0) else (len(rnnt_words) * 0.4)
+        step = total_time / len(rnnt_words)
+        return [
+            {
+                "text": w,
+                "start": round(i * step, 2),
+                "end": round((i + 1) * step, 2),
+            }
+            for i, w in enumerate(rnnt_words)
+        ]
+
+    # Quick path: exact 1-to-1 length match
+    if len(rnnt_words) == len(ctc_words):
+        aligned = []
+        for w, ctc in zip(rnnt_words, ctc_words):
+            aligned.append({
+                "text": w,
+                "start": ctc["start"],
+                "end": max(ctc["end"], round(ctc["start"] + 0.08, 2)),
+            })
+        return aligned
+
+    # Sequence alignment between CTC word texts and RNNT word texts
+    ctc_texts = [w["text"] for w in ctc_words]
+    matcher = difflib.SequenceMatcher(None, ctc_texts, rnnt_words)
+    aligned_words: list[dict | None] = [None] * len(rnnt_words)
+
+    for tag, i1, i2, j1, j2 in matcher.get_opcodes():
+        if tag == "equal":
+            for c_idx, r_idx in zip(range(i1, i2), range(j1, j2)):
+                aligned_words[r_idx] = {
+                    "text": rnnt_words[r_idx],
+                    "start": ctc_words[c_idx]["start"],
+                    "end": max(ctc_words[c_idx]["end"], round(ctc_words[c_idx]["start"] + 0.08, 2)),
+                }
+        elif tag == "replace":
+            win_start = ctc_words[i1]["start"]
+            win_end = ctc_words[i2 - 1]["end"]
+            if win_end <= win_start:
+                win_end = win_start + 0.4 * (j2 - j1)
+            span = (win_end - win_start) / max(1, (j2 - j1))
+            for offset, r_idx in enumerate(range(j1, j2)):
+                aligned_words[r_idx] = {
+                    "text": rnnt_words[r_idx],
+                    "start": round(win_start + offset * span, 2),
+                    "end": round(win_start + (offset + 1) * span, 2),
+                }
+        elif tag == "insert":
+            prev_end = ctc_words[i1 - 1]["end"] if i1 > 0 else 0.0
+            next_start = ctc_words[i1]["start"] if i1 < len(ctc_words) else (prev_end + 0.4 * (j2 - j1))
+            if next_start <= prev_end:
+                next_start = prev_end + 0.3 * (j2 - j1)
+            span = (next_start - prev_end) / max(1, (j2 - j1))
+            for offset, r_idx in enumerate(range(j1, j2)):
+                aligned_words[r_idx] = {
+                    "text": rnnt_words[r_idx],
+                    "start": round(prev_end + offset * span, 2),
+                    "end": round(prev_end + (offset + 1) * span, 2),
+                }
+        elif tag == "delete":
+            pass
+
+    # Pass 2: Fill any unassigned holes and enforce strict monotonicity
+    last_end = 0.0
+    final_words: list[dict] = []
+    for idx in range(len(aligned_words)):
+        item = aligned_words[idx]
+        if item is None:
+            w_dict = {
+                "text": rnnt_words[idx],
+                "start": round(last_end, 2),
+                "end": round(last_end + 0.3, 2),
+            }
+        else:
+            w_start = item["start"]
+            if w_start < last_end:
+                w_start = round(last_end, 2)
+            w_end = item["end"]
+            if w_end <= w_start:
+                w_end = round(w_start + 0.08, 2)
+            w_dict = {
+                "text": rnnt_words[idx],
+                "start": w_start,
+                "end": w_end,
+            }
+        last_end = w_dict["end"]
+        final_words.append(w_dict)
+
+    return final_words
 
 
 def transcribe_with_words(model, audio_paths: list[str], batch_size: int = 4,
-                          language_id: str | None = None) -> tuple[list[str], list[list[dict]]]:
-    """Transcribe a list of clips and extract acoustic word timestamps from the CTC alignment tensor."""
+                          language_id: str | None = None,
+                          decoder: str = "rnnt") -> tuple[list[str], list[list[dict]]]:
+    """Transcribe clips with hybrid accuracy: RNNT text recognition + CTC acoustic word alignments."""
     import inspect
 
     lang = language_id or LANGUAGE_ID
     parameters = inspect.signature(model.transcribe).parameters
-    options = {"batch_size": batch_size, "return_hypotheses": True}
+    options = {"batch_size": batch_size}
     if "language_id" in parameters:
         options["language_id"] = lang
     if "num_workers" in parameters:
         options["num_workers"] = 0
 
-    result = model.transcribe(audio_paths, **options)
-    # Hybrid model returns (rnnt_hyps, ctc_hyps) when return_hypotheses=True
-    if isinstance(result, (list, tuple)) and len(result) > 1 and isinstance(result[1], list):
-        hyps = result[1]
-    elif isinstance(result, (list, tuple)):
-        hyps = result[0] if isinstance(result[0], list) else result
+    if decoder == "rnnt":
+        # Pass A: RNNT Text Recognition (autoregressive LM generates valid words & grammar)
+        set_decoder(model, "rnnt")
+        raw_rnnt_texts = transcribe(model, audio_paths, batch_size=batch_size, language_id=lang)
+        clean_texts = [sanitize_malayalam_orthography(t) for t in raw_rnnt_texts]
+
+        # Pass B: CTC Acoustic Word Alignment (CTC frame alignments provide millisecond boundaries)
+        set_decoder(model, "ctc")
+        ctc_options = dict(options)
+        ctc_options["return_hypotheses"] = True
+        result = model.transcribe(audio_paths, **ctc_options)
+
+        if isinstance(result, (list, tuple)) and len(result) > 1 and isinstance(result[1], list):
+            hyps = result[1]
+        elif isinstance(result, (list, tuple)):
+            hyps = result[0] if isinstance(result[0], list) else result
+        else:
+            hyps = [result]
+
+        chunk_words = []
+        for i, hyp in enumerate(hyps):
+            if isinstance(hyp, list):
+                hyp = hyp[0]
+            _, ctc_words = decode_ctc_words(hyp, model.tokenizer, language_id=lang)
+            rnnt_words = clean_texts[i].split() if i < len(clean_texts) else []
+            aligned = align_words_to_ctc(rnnt_words, ctc_words)
+            chunk_words.append(aligned)
+
+        # Switch decoder back to default rnnt
+        set_decoder(model, "rnnt")
+        return clean_texts, chunk_words
+
     else:
-        hyps = [result]
+        # Fallback pure CTC decoding
+        set_decoder(model, "ctc")
+        ctc_options = dict(options)
+        ctc_options["return_hypotheses"] = True
+        result = model.transcribe(audio_paths, **ctc_options)
+        if isinstance(result, (list, tuple)) and len(result) > 1 and isinstance(result[1], list):
+            hyps = result[1]
+        elif isinstance(result, (list, tuple)):
+            hyps = result[0] if isinstance(result[0], list) else result
+        else:
+            hyps = [result]
 
-    texts = []
-    chunk_words = []
-    for hyp in hyps:
-        if isinstance(hyp, list):
-            hyp = hyp[0]
-        text, words = decode_ctc_words(hyp, model.tokenizer, language_id=lang)
-        texts.append(text)
-        chunk_words.append(words)
-
-    return texts, chunk_words
+        texts = []
+        chunk_words = []
+        for hyp in hyps:
+            if isinstance(hyp, list):
+                hyp = hyp[0]
+            text, words = decode_ctc_words(hyp, model.tokenizer, language_id=lang)
+            texts.append(text)
+            chunk_words.append(words)
+        return texts, chunk_words
 
 
 def evaluate_model(dataset_dir: str, splits: list[str], out_dir: str, label: str,

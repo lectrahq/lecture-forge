@@ -36,7 +36,7 @@ app = FastAPI(title="Local ASR (IndicConformer)")
 
 class TranscribeRequest(BaseModel):
     paths: list[str]              # WAV files inside the shared data folder
-    decoder: str = "ctc"          # 'ctc' is faster; 'rnnt' is usually more accurate
+    decoder: str = "rnnt"         # 'rnnt' produces grammatical words; 'ctc' for fast greedy
     # Where to report how far along this is. Both containers share the data folder,
     # so the backend can read it while this one request is still running - which is
     # how the website shows progress without the model being reloaded per batch.
@@ -157,7 +157,7 @@ def transcribe(request: TranscribeRequest):
         _write_progress(progress_path, 0, len(paths), transcribing_started)
         for start in range(0, len(paths), GROUP_SIZE):
             group = paths[start:start + GROUP_SIZE]
-            t_batch, w_batch = common.transcribe_with_words(model, group, batch_size)
+            t_batch, w_batch = common.transcribe_with_words(model, group, batch_size, decoder=request.decoder)
             texts.extend(t_batch)
             chunk_words.extend(w_batch)
             # Give the memory back before starting the next group, so a long

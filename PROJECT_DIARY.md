@@ -3,6 +3,41 @@
 Newest entries first. MAJOR = new feature or change to how the system is built or
 deployed; MINOR = small fix, wording or documentation change.
 
+## 2026-10-24 — Hybrid Dual-Pass Local ASR (RNNT Grammar + CTC Acoustic Alignment) & Malayalam Orthographic Sanitizer [MAJOR]
+
+**What changed:** Users reported that while English loan words were transcribed into Malayalam script well, pure Malayalam words transcribed by the local model were frequently ungrammatical, nonsensical phoneme approximations, or contained invalid Unicode ligatures (such as double viramas `്്`, viramas attached to atomic chillus `നമ്മൾ്`, broken conjuncts `സ്റ്റാർ്ടട്ട്`, and orphaned viramas at sentence boundaries).
+
+1. **Root Cause Analysis:**
+   - The local ASR container defaulted to greedy CTC decoding (`decoder="ctc"`).
+   - In `gpu/common.py`, `transcribe_with_words()` was overriding segment text with raw CTC output (`hyps = result[1]`), bypassing the autoregressive RNNT prediction network.
+   - CTC assumes conditional frame independence (no internal language model). When Malayalam speech exhibits coarticulation or soft codas, CTC emits phonetically adjacent non-words and corrupted ligatures (`് പറയുന്നത്`, `സ്റ്റാർ്ടട്ട്`, `ഫോർ്ത്ത്`, `മാസിക്കണമിലെ` instead of `മാസ് അക്കാഡമിയുടെ`).
+   - English loan words worked because their acoustic syllables are phonetically sharp and sparse in the 256-token BPE vocabulary.
+2. **Hybrid Dual-Pass Decoding Architecture:**
+   - AI4Bharat's `EncDecHybridRNNTCTCBPEModel` contains both RNNT and CTC decoders on the same shared Conformer acoustic encoder.
+   - **Pass A (RNNT Recognition):** Switches decoding strategy to `rnnt`. The autoregressive prediction network and joint network construct grammatically coherent Malayalam sentences with valid Malayalam dictionary words.
+   - **Pass B (CTC Acoustic Alignment):** Switches decoding strategy to `ctc` with `return_hypotheses=True`. Greedy CTC generates frame-level alignments at 40ms resolution.
+   - **Dynamic Sequence Alignment:** In `align_words_to_ctc()`, dynamic programming (`difflib.SequenceMatcher`) assigns exact acoustic `[start, end]` intervals from CTC to the clean RNNT words, enforcing strict monotonic timestamps without time drift.
+3. **Automated Malayalam Orthographic & Unicode Sanitizer:**
+   - Added `sanitize_malayalam_orthography()` in `backend/normalise.py` (and imported in `gpu/common.py`):
+     - Normalizes `ൻ` + `്` + `റ` (`ൻ്റ`/`ൻ്റെ`) to standard Malayalam conjunct `ന്റ`/`ന്റെ` (NA + VIRAMA + RRA).
+     - Strips orphaned leading viramas at segment cuts or whitespace boundaries.
+     - Strips invalid viramas directly following vowel signs (e.g. `ി്`, `ാ്`, `ു്`).
+     - Collapses duplicate stacked viramas and vowel signs.
+     - Strips viramas erroneously attached to atomic chillu characters (`[ൺ-ൿ]`).
+4. **End-to-End Live Verification:**
+   - Default decoder set to `"rnnt"` in `asr/server.py` and `backend/local_asr.py`.
+   - Verified on actual lecture audio (`20261023-205903-3da4a4`):
+     - Old CTC output: `നമസ്കാരം ആർഗ എസ് മാസിക്കണമിലെ പുതിവിീഡയിലേക്ക് എല്ലാവർക്കും സ്വാഗം ഇന നമ്മൾ്...` (gibberish non-words, broken ligatures)
+     - New Hybrid output: `നമസ്കാരം ആർഗിഎസ് മാസിക്കണമിലെ പുതിയ വീടിലേക്ക് എല്ലാവർക്കും സ്വാഗതം ഇനി നമ്മൾ ചെയ്യാൻ പോകുന്ന കോഷ്യസ് ഇന്റഗ്രൽ ഫോര്മുലാ യുടെ ബാക്കി പ്രോബ്ലം ആണ്...` (clean Malayalam grammar, real words, 100% valid Unicode, exact sub-second acoustic word timestamps).
+
+**Files touched:**
+- `backend/normalise.py` — added `sanitize_malayalam_orthography()`; integrated into `normalise_text()`.
+- `gpu/common.py` — added `align_words_to_ctc()`; upgraded `transcribe_with_words()` to hybrid dual-pass (RNNT text + CTC acoustic alignments); defaulted `load_model()` to `rnnt`.
+- `asr/server.py` — updated `TranscribeRequest.decoder` default to `"rnnt"`; passed `decoder=request.decoder` to `transcribe_with_words()`.
+- `backend/local_asr.py` — updated `transcribe_clips()` and `transcribe_clips_with_words()` default decoder to `"rnnt"`.
+
+---
+
 ## 2026-10-24 — Mobile browser viewport overflow & layout fix [MAJOR]
 
 **What changed:** On mobile browsers (iPhone Safari, Android Chrome, etc.), the page exhibited horizontal scrolling, causing the layout to appear zoomed-out or off-center, with the right edge cut off.

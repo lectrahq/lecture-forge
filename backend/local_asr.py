@@ -44,7 +44,7 @@ def available() -> bool:
 DEFAULT_BATCH_SIZE = 2
 
 
-def transcribe_clips(paths: list[str], decoder: str = "ctc",
+def transcribe_clips(paths: list[str], decoder: str = "rnnt",
                      batch_size: int = DEFAULT_BATCH_SIZE,
                      progress_path: str | None = None) -> list[str]:
     """Transcribe a list of WAV files, returning one piece of text per file."""
@@ -53,7 +53,7 @@ def transcribe_clips(paths: list[str], decoder: str = "ctc",
     return texts
 
 
-def transcribe_clips_with_words(paths: list[str], decoder: str = "ctc",
+def transcribe_clips_with_words(paths: list[str], decoder: str = "rnnt",
                                 batch_size: int = DEFAULT_BATCH_SIZE,
                                 progress_path: str | None = None) -> tuple[list[str], list[list[dict]]]:
     """Transcribe a list of WAV files, returning both text and exact acoustic word timestamps per clip."""

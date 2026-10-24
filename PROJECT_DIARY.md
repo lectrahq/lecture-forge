@@ -3,6 +3,50 @@
 Newest entries first. MAJOR = new feature or change to how the system is built or
 deployed; MINOR = small fix, wording or documentation change.
 
+## 2026-10-25 — Smart Manglish Alignment: Acronym Expansion, Compound Agglutination & Accurate OOV Error Attribution [MAJOR]
+
+**What changed:** 
+1. **Identified Root Causes of Alignment & Heatmap Failure in Code-Switched Lectures:**
+   - **Script Discrepancy & Naive Edit Distance:** ElevenLabs writes technical English loanwords in Latin script (`RVS`, `Maths`, `Academy`), whereas the local AI4Bharat IndicConformer model has a 256-token Malayalam-only vocabulary and transcribes all English phonetically in Malayalam script (`ആർവിഎസ്`, `മാസ്`, `അക്കാഡമി`). Previous 1-to-1 token alignment treated Latin vs Malayalam tokens as unrelated strings or deletions, triggering cascade misalignments where `RVS` was falsely marked deleted, `Maths` was matched to `ആർവിഎസ്`, `Academy` was matched to `മാസ്`, and `യുടെ` was matched to `അക്കാഡമിയുടെ`.
+   - **Malayalam Agglutination & Token Compounding (2-to-1 Mismatch):** In Malayalam grammar, case markers and postpositions (`യുടെ`, `ന്റെ`, `ൽ`, `ക്ക്`, `ന്`, `ഉം`, `ലേക്ക്`, `കാരുടെ`) are agglutinated directly onto the noun as suffixes. ElevenLabs separated English loanwords and Malayalam case markers with a space (`Academy യുടെ`, `S3 കാരുടെ`, `module ന്റെ`), whereas the local model produced a single compound word (`അക്കാഡമിയുടെ`, `എസ്റ്റീക്കാരുടെ`, `മോഡ്യൂളിന്റെ`). Standard 1-to-1 DP could not merge multi-token sequences, forcing artificial deletions and shifting the alignment of all subsequent words in the segment.
+   - **Corrupted Dictionary Derivations:** Earlier naive `jiwer` alignment runs in `build_english_map.py` had derived distorted proposed candidates (`maths -> ബിസ്`, `academy -> മസ്സ്`, `rvs -> ആർ`) due to this very token shift, which corrupted the spelling table when approved.
+2. **Multi-Token Dynamic Programming Sequence Alignment:**
+   - Re-engineered `align_sequence_smart` in `backend/wer_visualizer.py` with multi-token DP transitions:
+     - **2-to-1 Ref Compound Transitions:** Detects when adjacent reference tokens `(r[i-2], r[i-1])` merge into hypothesis token `h[j-1]` (e.g. `Academy യുടെ ↔ അക്കാഡമിയുടെ`, `module ന്റെ ↔ മോഡ്യൂളിന്റെ`, `S3 കാരുടെ ↔ എസ്റ്റീക്കാരുടെ`).
+     - **1-to-2 Split Transitions:** Detects when reference token `r[i-1]` splits into hypothesis tokens `(h[j-2], h[j-1])` (e.g. `textbook ↔ ടെക്സ്റ്റ് ബുക്ക്`).
+   - Implemented `get_morphological_variants()` incorporating Malayalam morphophonemic rules (consonant gemination for `കാരുടെ`/`കൾ`, virama vowel junctions for `ിന്റെ`/`ന്റെ`, `ിൽ`/`ൽ`, `ിന്`/`ന്`, `ിക്ക്`/`ക്ക്`, `ഉം`/`വും`, `ലേക്ക്`/`ിലേക്ക്`).
+3. **Phonetic Acronym Expander & High-Frequency Academic Loanword Lexicon:**
+   - Added letter-by-letter phonetic expansion for English capital acronyms (`RVS -> ആർവിഎസ്`, `S3 -> എസ്റ്റീ/എസ്ത്രീ`, `MAT -> എംഎടി/മാറ്റ്`, `KTU -> കെടിയു`, `RMS -> ആർഎംഎസ്`, `SNR -> എസ്എൻആർ`).
+   - Built a core phonetic dictionary of ~100 common mathematical and engineering lecture loanwords (`maths -> മാത്സ്`, `complex -> കോംപ്ലക്സ്`, `variable -> വേരിയബിൾ`, `integration -> ഇന്റഗ്രേഷൻ`, `differentiation -> ഡിഫറൻഷ്യേഷൻ/ഡിഫ്ഫേരേന്സേഷന്`, `matrix -> മാട്രിക്സ്`, `formula -> ഫോർമുല`, `syllabus -> സിലബസ്`).
+   - Optimized DP forward pass with precomputed `O(1)` candidate and compound sets, computing 113 lecture segments in under 2 seconds.
+4. **Accurate OOV Error Attribution & Token Diff UI:**
+   - In `0:05 – 0:12` of lecture `20261024-185847-73c17d`:
+     - `നമസ്കാരം` ↔ `നമസ്കാരം` (Exact Match, 0 errors)
+     - `RVS` ↔ `ആർവിഎസ്` (Acronym Match, 0 errors)
+     - `Maths` ↔ `മാസ്` (True Substitution Error: Expected `Maths/മാത്സ്` → Local predicted `മാസ്`, 1 error)
+     - `Academy യുടെ` ↔ `അക്കാഡമിയുടെ` (Compound Agglutination Match, 0 errors)
+     - `പുതിയ വീഡിയോയിലേക്ക് എല്ലാവർക്കും സ്വാഗതം` (Exact Match, 0 errors)
+     - Total phrase errors: **exactly 1** (Maths → മാസ്).
+   - In the OOV Heatmap table, `Maths` is correctly tracked with top acoustic confusion `മാസ് (1)`, and `RVS` / `Academy` are no longer marked as false errors.
+   - Enhanced `frontend/src/WerHeatmap.jsx` and `App.css` to render `.tok-compound` dashed indicators and detailed hover tooltips (`Compound match: "Academy യുടെ" ↔ "അക്കാഡമിയുടെ"`).
+   - Cleaned corrupted candidate and mapping entries in `data/english_map.json` on the server for `rvs`, `maths`, and `academy`.
+
+**Files touched:**
+- `backend/wer_visualizer.py` — multi-token Wagner-Fischer sequence alignment, phonetic acronym expander, morphological compound generator, precomputed candidate lookup, and OOV attribution.
+- `backend/test_smart_align.py` — regression unit test verifying user test case and OOV heatmap tracking.
+- `frontend/src/WerHeatmap.jsx` — compound and phonetic match annotations with hover tooltips in Token Diff View.
+- `frontend/src/App.css` — styling for `.tok-compound` and `.tok-compound-hint`.
+
+**How to check it:**
+1. Open https://forge.rejected.cc on desktop or mobile.
+2. Select lecture `20261024-185847-73c17d` and switch to the **Comparison** tab.
+3. In Segment 1 (`0:05 – 0:12`), observe the Token Diff view:
+   - `നമസ്കാരം`, `RVS`, `Academy യുടെ (അക്കാഡമിയുടെ)`, `പുതിയ`, `വീഡിയോയിലേക്ക്`, `എല്ലാവർക്കും`, `സ്വാഗതം` are all matches.
+   - The only substitution highlighted is `Maths → മാസ്`.
+4. Switch to the **OOV & Technical Heatmap** tab: `RVS` and `Academy` are not listed as errors; `Maths` shows 1 occurrence, 1 error, and top confusion `മാസ്`.
+
+---
+
 ## 2026-10-24 — Fix Right-Side Content Cropping & Audio Health Grid Blowout on Mobile [MAJOR]
 
 **What changed:** 

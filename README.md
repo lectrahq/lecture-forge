@@ -80,6 +80,25 @@ with an error message). Work runs asynchronously in the background.
    - Built-in audio clarity preview player before submitting.
    - Automatically packaged and converted by the backend into uncompressed 16 kHz WAV, feeding directly into the chosen transcription engine and dataset pipeline.
 
+8. **Visual Word Error Rate (WER) & CER Heatmap Studio**:
+   - Exact token-level sequence alignment using Wagner-Fischer Dynamic Programming (minimizing edit distance: substitutions, deletions, insertions, and matches).
+   - Multi-colored **Timeline Heatmap Ribbon**: interactive visual timeline spanning the whole lecture color-coded by error severity (green for match, yellow for <25% WER, amber for 25–50%, red for >50%).
+   - Interactive hover tooltips showing segment time, WER%, and error counts; clicking any bar scrolls directly to the segment or plays its audio snippet.
+   - **Interactive Token Diff Mode**: displays exact matches, substitutions in warm amber badges with expected vs predicted hover tooltips, deletions in red strikethrough badges, and insertions in orange badges.
+   - Category metrics scorecards: Overall Agreement%, Discrepancy WER%, Character Error Rate (CER%), Malayalam Native WER%, and Technical Loanword WER%.
+   - Instant recompute option when dictionary transliterations are approved.
+
+9. **Out-of-Vocabulary (OOV) & Technical Error Heatmap**:
+   - Automatically aggregates and ranks recurring technical and mathematical loanwords where the local model struggled (e.g., `integral`, `pi`, `limit`, `matrix`, `complex`, `sin`, `cauchy`).
+   - Displays error frequency, error rate progress bars, and top acoustic confusion hypotheses (what the model predicted instead).
+   - "View in Diff" action to instantly locate and inspect all occurrences in the active transcript.
+
+10. **Dataset Acoustic Health & Diversity Metrics Hub**:
+    - Telemetry and corpus analytics aggregated across all training lectures in the Dataset tab (`/api/dataset/summary`).
+    - Evaluates acoustic quality: Mean Signal-to-Noise Ratio (SNR dB), Speech Loudness (RMS dBFS), Speech Activity Ratio (%), and Digital Ceiling Clipping sample counts.
+    - **Clip Duration Distribution Histogram**: visual bar chart verifying that audio clips fall into the golden 5s–20s range for NeMo training convergence.
+    - **Lexical Diversity**: Spoken tokens count, unique vocabulary types, Type-Token Ratio (TTR), technical loanword count, and frequent academic domain terms.
+
 ### Choosing how a lecture is transcribed
 
 Two questions on the submit form:

@@ -3543,3 +3543,191 @@ button.alt:hover {
   cursor: pointer;
 }
 
+/* ===================================================================
+   Confirmation Modal & Delete Styles
+   =================================================================== */
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 16px;
+  animation: modalFadeIn 180ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.modal-dialog {
+  background: var(--surface);
+  border: 1px solid var(--border-firm);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-lg), 0 0 32px rgba(0, 0, 0, 0.3);
+  width: 100%;
+  max-width: 520px;
+  overflow: hidden;
+  animation: modalSlideUp 220ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes modalFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes modalSlideUp {
+  from { opacity: 0; transform: translateY(12px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.modal-header {
+  padding: 20px 24px 16px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+.modal-header.danger {
+  background: var(--bad-soft);
+  border-bottom-color: rgba(244, 63, 94, 0.2);
+}
+
+.modal-danger-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: rgba(244, 63, 94, 0.18);
+  color: var(--bad);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.modal-danger-icon svg {
+  width: 22px;
+  height: 22px;
+}
+
+.modal-title {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1.25;
+}
+
+.modal-body {
+  padding: 20px 24px;
+  color: var(--text-soft);
+  font-size: 0.925rem;
+  line-height: 1.55;
+}
+
+.modal-lecture-card {
+  margin: 14px 0 16px;
+  padding: 12px 14px;
+  background: var(--surface-2);
+  border-radius: var(--r-sm);
+  border: 1px solid var(--border);
+}
+
+.modal-lecture-title {
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 4px;
+  word-break: break-word;
+}
+
+.modal-lecture-meta {
+  font-size: 0.8rem;
+  color: var(--text-faint);
+}
+
+.modal-bullet-list {
+  margin: 10px 0 0 18px;
+  padding: 0;
+  font-size: 0.85rem;
+  color: var(--text-soft);
+}
+
+.modal-bullet-list li {
+  margin-bottom: 6px;
+}
+
+.modal-footer {
+  padding: 16px 24px 20px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  background: var(--surface-2);
+  border-top: 1px solid var(--border);
+}
+
+.btn-danger {
+  background: var(--bad) !important;
+  color: #ffffff !important;
+  border: none !important;
+  font-weight: 600;
+  padding: 9px 18px;
+  border-radius: var(--r-sm);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  transition: opacity 140ms ease, transform 140ms ease;
+  box-shadow: 0 2px 8px rgba(244, 63, 94, 0.3);
+}
+
+.btn-danger:hover:not(:disabled) {
+  opacity: 0.92;
+  transform: translateY(-1px);
+}
+
+.btn-danger:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.delete-lecture-btn {
+  background: transparent;
+  border: 1px solid rgba(244, 63, 94, 0.4);
+  color: var(--bad);
+  padding: 6px 12px;
+  border-radius: var(--r-sm);
+  font-size: 0.82rem;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  transition: all 140ms ease;
+}
+
+.delete-lecture-btn:hover {
+  background: var(--bad-soft);
+  border-color: var(--bad);
+}
+
+.job-card-delete-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-faint);
+  padding: 6px;
+  border-radius: var(--r-sm);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 140ms ease;
+  margin-left: 6px;
+}
+
+.job-card-delete-btn:hover {
+  color: var(--bad);
+  background: var(--bad-soft);
+}
+

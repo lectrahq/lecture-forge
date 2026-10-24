@@ -3,6 +3,33 @@
 Newest entries first. MAJOR = new feature or change to how the system is built or
 deployed; MINOR = small fix, wording or documentation change.
 
+## 2026-10-24 — Permanent Deletion of Local Model Transcriptions & Immediate Audio Player Duration Fix [MAJOR]
+
+**What changed:** 
+1. **Permanent Delete Option for Local Model Transcriptions:**
+   - Any video transcribed via the local model (`engine === "local"` or `engine === "both"` or containing local transcript) now has a dedicated Delete option.
+   - Available both on the lecture card in the Library view and directly within the active lecture workspace.
+   - **Pre-Deletion Confirmation Modal:** Displays a modal (`ConfirmDeleteModal`) detailing the lecture title, ID, engine, duration, and explaining that the 16 kHz uncompressed audio, transcripts, word alignments, and database rows will be permanently wiped.
+   - **Immediate Counter Deduction:** Because `backend/db.py:usage_totals()` aggregates completed jobs dynamically via SQL `SUM(duration)` and `SUM(local_seconds)`, calling `DELETE /api/jobs/{job_id}` immediately deletes the SQLite row and removes all disk files (`data/<job_id>`). This automatically subtracts the lecture's audio duration and processing runtime from the local model's cumulative counter, as if the lecture was never given to the server.
+2. **Audio Player Duration Truncation Bug Fix:**
+   - When a link was submitted for transcription, once the audio was downloaded to the server, playback initially showed a premature or truncated duration (e.g. 10 mins instead of 40 mins), only showing the original length after a full page refresh.
+   - **Root Cause:** When streaming 76MB+ uncompressed WAV files over HTTP range headers, browser HTML5 `<audio>` elements fire `loadedmetadata` with partial buffered duration estimates. In `FullAudioPlayer`, `handleLoadedMetadata` was setting `duration` state, and the polling update had a guard `if (job.duration && !duration)` which prevented the authoritative Python `wav_duration` from overriding the estimate once set.
+   - **Fix:** In `FullAudioPlayer`, computed `const effectiveDuration = (job.duration && job.duration > 0) ? job.duration : (duration || 0);` and ensured that `handleLoadedMetadata` only falls back to browser estimates if `job.duration` is not yet present. The timeline scrubber, progress percentage, badge, and total duration labels now immediately display the true 40-minute duration as soon as the audio download finishes.
+
+**Files touched:**
+- `backend/db.py` — added `delete_job(job_id: str) -> bool`.
+- `backend/main.py` — added `DELETE /api/jobs/{job_id}` endpoint (removes disk folder `data/<job_id>`, progress cache, word sample cache, and database row).
+- `frontend/src/api.js` — exported `deleteJob(id)`.
+- `frontend/src/App.jsx` — added `IconTrash`, `IconAlertTriangle`, `ConfirmDeleteModal`, wired deletion flow in `App`, `JobStatus`, and `JobList`; fixed `FullAudioPlayer` duration handling to prioritize authoritative `job.duration`.
+- `frontend/src/App.css` — added styling for modal dialogs, danger action headers, and delete buttons.
+
+**How to check it:**
+1. Open https://forge.rejected.cc/#library. Click on any local model lecture.
+2. In the player, the total duration immediately shows the full audio length (e.g. 44:37) instead of 10m.
+3. Click "Delete Lecture"; review the confirmation dialog; click "Delete Permanently". Notice the lecture is removed, its folder on disk is erased, and `/api/usage` immediately shows the deducted counter values.
+
+---
+
 ## 2026-10-24 — Hybrid Dual-Pass Local ASR (RNNT Grammar + CTC Acoustic Alignment) & Malayalam Orthographic Sanitizer [MAJOR]
 
 **What changed:** Users reported that while English loan words were transcribed into Malayalam script well, pure Malayalam words transcribed by the local model were frequently ungrammatical, nonsensical phoneme approximations, or contained invalid Unicode ligatures (such as double viramas `്്`, viramas attached to atomic chillus `നമ്മൾ്`, broken conjuncts `സ്റ്റാർ്ടട്ട്`, and orphaned viramas at sentence boundaries).

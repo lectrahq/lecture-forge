@@ -22,6 +22,7 @@ import {
   segmentAudioUrl,
   setEnglishSpelling,
   bulkApproveSpellings,
+  deleteJob,
   streamAudioUrl,
   uploadFile,
 } from "./api.js";
@@ -339,6 +340,27 @@ function IconX() {
   );
 }
 
+function IconTrash() {
+  return (
+    <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <polyline points="3 6 5 6 21 6" />
+      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+      <line x1="10" y1="11" x2="10" y2="17" />
+      <line x1="14" y1="11" x2="14" y2="17" />
+    </svg>
+  );
+}
+
+function IconAlertTriangle() {
+  return (
+    <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z" />
+      <line x1="12" y1="9" x2="12" y2="13" />
+      <line x1="12" y1="17" x2="12.01" y2="17" />
+    </svg>
+  );
+}
+
 function IconVolume() {
   return (
     <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -525,6 +547,76 @@ function MobileBottomDock({ activeTab, onSelectTab, jobsCount, currentId }) {
   );
 }
 
+// --- Confirmation Modal for Permanent Job Deletion ---
+function ConfirmDeleteModal({ job, onConfirm, onCancel, deleting }) {
+  if (!job) return null;
+  const isLocal = job.engine === "local" || job.engine === "both" || job.local_seconds != null;
+
+  return (
+    <div
+      className="modal-backdrop"
+      onClick={onCancel}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="modal-delete-title"
+    >
+      <div className="modal-dialog" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-header danger">
+          <div className="modal-danger-icon">
+            <IconAlertTriangle />
+          </div>
+          <div>
+            <h3 id="modal-delete-title" className="modal-title">Delete Lecture Permanently?</h3>
+            <span className="muted small" style={{ color: "var(--bad)" }}>
+              Destructive action · Cannot be undone
+            </span>
+          </div>
+        </div>
+
+        <div className="modal-body">
+          <p>
+            Are you sure you want to permanently delete this lecture from the server?
+          </p>
+
+          <div className="modal-lecture-card">
+            <div className="modal-lecture-title">{job.title || job.filename || job.job_id}</div>
+            <div className="modal-lecture-meta">
+              {job.engine === "local" ? "Local IndicConformer" : job.engine === "both" ? "Dual Engine" : "ElevenLabs"}
+              {job.duration != null && ` · ${formatTime(job.duration)}`}
+              {` · ID: ${job.job_id}`}
+            </div>
+          </div>
+
+          <p style={{ fontWeight: 600, color: "var(--text)" }}>When deleted, the server will immediately purge:</p>
+          <ul className="modal-bullet-list">
+            <li>The 16 kHz uncompressed audio file and raw downloads</li>
+            <li>All generated transcripts, word timestamps, and silence alignments</li>
+            {isLocal && (
+              <li>
+                <strong>Local model time counter:</strong> All elapsed audio seconds and processing runtime added by this lecture will be completely removed from the cumulative counter.
+              </li>
+            )}
+            <li>All segment audio clips and database records</li>
+          </ul>
+          <p className="muted small" style={{ marginTop: 14 }}>
+            It will be as if this lecture was never given to the server.
+          </p>
+        </div>
+
+        <div className="modal-footer">
+          <button type="button" className="ghost" onClick={onCancel} disabled={deleting}>
+            Cancel
+          </button>
+          <button type="button" className="btn-danger" onClick={onConfirm} disabled={deleting}>
+            <IconTrash />
+            {deleting ? "Deleting from server…" : "Delete Permanently"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // --- Main Application ---
 export default function App() {
   const [jobs, setJobs] = useState([]);
@@ -555,6 +647,8 @@ export default function App() {
   const [audioIsPlaying, setAudioIsPlaying] = useState(false);
   const [audioSeekRequest, setAudioSeekRequest] = useState(null);
   const [audioTogglePlayTrigger, setAudioTogglePlayTrigger] = useState(0);
+  const [jobToDelete, setJobToDelete] = useState(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Sync with browser back/forward buttons
   useEffect(() => {
@@ -601,6 +695,28 @@ export default function App() {
     listJobs().then(setJobs).catch(() => {});
     getUsage().then(setUsage).catch(() => {});
   }, []);
+
+  const handleDeleteConfirm = useCallback(async () => {
+    if (!jobToDelete) return;
+    setIsDeleting(true);
+    try {
+      await deleteJob(jobToDelete.job_id);
+      const deletedId = jobToDelete.job_id;
+      setJobToDelete(null);
+      if (currentId === deletedId) {
+        setCurrentId(null);
+        setJob(null);
+        setTranscript(null);
+        setComparison(null);
+        navigateToTab("library");
+      }
+      refreshJobs();
+    } catch (err) {
+      alert("Failed to delete lecture: " + (err.message || err));
+    } finally {
+      setIsDeleting(false);
+    }
+  }, [jobToDelete, currentId, navigateToTab, refreshJobs]);
 
   useEffect(refreshJobs, [refreshJobs]);
 
@@ -691,6 +807,7 @@ export default function App() {
               currentId={currentId}
               onOpen={openJob}
               onRefresh={refreshJobs}
+              onDeleteRequest={setJobToDelete}
             />
           </div>
         )}
@@ -732,6 +849,7 @@ export default function App() {
                         setJob(updated);
                         refreshJobs();
                       }}
+                      onDeleteRequest={setJobToDelete}
                       audioIsPlaying={audioIsPlaying}
                       onAudioPlayStateChange={setAudioIsPlaying}
                       audioSeekRequest={audioSeekRequest}
@@ -809,6 +927,15 @@ export default function App() {
         jobsCount={jobs.length}
         currentId={currentId}
       />
+
+      {jobToDelete && (
+        <ConfirmDeleteModal
+          job={jobToDelete}
+          onConfirm={handleDeleteConfirm}
+          onCancel={() => setJobToDelete(null)}
+          deleting={isDeleting}
+        />
+      )}
     </>
   );
 }
@@ -1231,18 +1358,22 @@ function FullAudioPlayer({
 
   const streamSrc = streamAudioUrl(job.job_id);
 
+  // Authoritative duration: Python wave measurement on the server is exact and ground-truth.
+  // HTML5 audio elements streaming partial byte ranges over HTTP may report premature durations (e.g. 10m instead of 40m).
+  const effectiveDuration = (job.duration && job.duration > 0) ? job.duration : (duration || 0);
+
   useEffect(() => {
-    if (job.duration && !duration) {
+    if (job.duration && job.duration > 0) {
       setDuration(job.duration);
     }
-  }, [job.duration, duration]);
+  }, [job.duration]);
 
   // Handle external seek requests (e.g. clicking a word in the transcript)
   useEffect(() => {
     if (!seekRequest) return;
     const audio = audioRef.current;
     if (!audio) return;
-    const target = Math.max(0, Math.min(duration || 99999, seekRequest.time));
+    const target = Math.max(0, Math.min(effectiveDuration || 99999, seekRequest.time));
     audio.currentTime = target;
     setCurrentTime(target);
     window.dispatchEvent(new CustomEvent("forge:audioseek", {
@@ -1252,7 +1383,7 @@ function FullAudioPlayer({
       setIsPlaying(true);
       if (onPlayStateChange) onPlayStateChange(true);
     }).catch(() => {});
-  }, [seekRequest, duration, job.job_id, onPlayStateChange]);
+  }, [seekRequest, effectiveDuration, job.job_id, onPlayStateChange]);
 
   // Handle play/pause toggles from transcript header
   useEffect(() => {
@@ -1284,7 +1415,8 @@ function FullAudioPlayer({
     if (!audio) return;
 
     const handleLoadedMetadata = () => {
-      if (audio.duration && !isNaN(audio.duration) && audio.duration !== Infinity) {
+      // ONLY fallback to audio.duration if job.duration is not yet set
+      if (!job.duration && audio.duration && !isNaN(audio.duration) && audio.duration !== Infinity) {
         setDuration(audio.duration);
       }
     };
@@ -1319,7 +1451,7 @@ function FullAudioPlayer({
       audio.removeEventListener("play", handlePlay);
       audio.removeEventListener("pause", handlePause);
     };
-  }, [job.job_id, onPlayStateChange]);
+  }, [job.job_id, job.duration, onPlayStateChange]);
 
   function togglePlay() {
     const audio = audioRef.current;
@@ -1334,7 +1466,7 @@ function FullAudioPlayer({
   function skip(seconds) {
     const audio = audioRef.current;
     if (!audio) return;
-    const target = Math.max(0, Math.min(duration || 99999, audio.currentTime + seconds));
+    const target = Math.max(0, Math.min(effectiveDuration || 99999, audio.currentTime + seconds));
     audio.currentTime = target;
     setCurrentTime(target);
     window.dispatchEvent(new CustomEvent("forge:audioseek", {
@@ -1388,7 +1520,7 @@ function FullAudioPlayer({
   }
 
   const effectiveCurrent = isSeeking ? seekValue : currentTime;
-  const progressPercent = duration > 0 ? Math.min(100, (effectiveCurrent / duration) * 100) : 0;
+  const progressPercent = effectiveDuration > 0 ? Math.min(100, (effectiveCurrent / effectiveDuration) * 100) : 0;
 
   return (
     <div className={`full-audio-player ${isPlaying ? "playing" : ""}`}>
@@ -1402,7 +1534,7 @@ function FullAudioPlayer({
         <div className="player-status-badge">
           <span className={`pulse-indicator ${isPlaying ? "active" : ""}`} />
           <strong>Full Lecture Audio (WAV, 16 kHz Mono)</strong>
-          {duration > 0 && <span className="muted small">· {formatTime(duration)}</span>}
+          {effectiveDuration > 0 && <span className="muted small">· {formatTime(effectiveDuration)}</span>}
         </div>
         <div className="player-top-actions">
           <a href={audioUrl(job.job_id)} download className="player-download-btn" title="Download uncompressed WAV">
@@ -1452,7 +1584,7 @@ function FullAudioPlayer({
               type="range"
               className="player-scrubber"
               min="0"
-              max={duration || 100}
+              max={effectiveDuration || 100}
               step="0.1"
               value={effectiveCurrent}
               onMouseDown={handleSeekStart}
@@ -1466,7 +1598,7 @@ function FullAudioPlayer({
               aria-label="Seek time"
             />
           </div>
-          <span className="player-time-label total">{formatTime(duration)}</span>
+          <span className="player-time-label total">{formatTime(effectiveDuration)}</span>
         </div>
 
         {/* Speed Controls */}
@@ -1514,6 +1646,7 @@ function FullAudioPlayer({
 function JobStatus({
   job,
   onPromoted,
+  onDeleteRequest,
   audioIsPlaying,
   onAudioPlayStateChange,
   audioSeekRequest,
@@ -1536,6 +1669,8 @@ function JobStatus({
     }
   }
 
+  const isLocalJob = job.engine === "local" || job.engine === "both" || job.local_seconds != null;
+
   return (
     <div>
       <h2>{job.title}</h2>
@@ -1547,29 +1682,42 @@ function JobStatus({
         {` · ID: ${job.job_id}`}
       </p>
 
-      <div className="badges">
-        <span className="badge engine">
-          {job.engine === "elevenlabs" && <IconMic />}
-          {job.engine === "local" && <IconCpu />}
-          {job.engine === "both" && <IconDual />}
-          {ENGINE_LABELS[job.engine] || job.engine}
-        </span>
-        <span className={job.purpose === "training" ? "badge training" : "badge"}>
-          {job.purpose === "training" ? <IconTraining /> : <IconTranscript />}
-          {job.purpose === "training" ? "Training data" : "Transcript only"}
-        </span>
-        <span className={`badge ${job.status}`}>
-          {STAGE_LABELS[job.status] || job.status}
-        </span>
-        {job.human_verified && (
-          <span className="badge verified">
-            <IconShieldCheck /> Human Verified
+      <div className="badges" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }}>
+          <span className="badge engine">
+            {job.engine === "elevenlabs" && <IconMic />}
+            {job.engine === "local" && <IconCpu />}
+            {job.engine === "both" && <IconDual />}
+            {ENGINE_LABELS[job.engine] || job.engine}
           </span>
-        )}
-        {job.audio_health && (
-          <span className={`badge health-${job.audio_health.rating.toLowerCase()}`}>
-            <IconHealth /> {job.audio_health.score}/100 {job.audio_health.rating}
+          <span className={job.purpose === "training" ? "badge training" : "badge"}>
+            {job.purpose === "training" ? <IconTraining /> : <IconTranscript />}
+            {job.purpose === "training" ? "Training data" : "Transcript only"}
           </span>
+          <span className={`badge ${job.status}`}>
+            {STAGE_LABELS[job.status] || job.status}
+          </span>
+          {job.human_verified && (
+            <span className="badge verified">
+              <IconShieldCheck /> Human Verified
+            </span>
+          )}
+          {job.audio_health && (
+            <span className={`badge health-${job.audio_health.rating.toLowerCase()}`}>
+              <IconHealth /> {job.audio_health.score}/100 {job.audio_health.rating}
+            </span>
+          )}
+        </div>
+
+        {isLocalJob && (job.status === "done" || job.status === "failed") && (
+          <button
+            type="button"
+            className="delete-lecture-btn"
+            onClick={() => onDeleteRequest && onDeleteRequest(job)}
+            title="Permanently delete all audio, transcripts, and model time records for this lecture"
+          >
+            <IconTrash /> Delete Lecture
+          </button>
         )}
       </div>
 
@@ -2803,7 +2951,7 @@ function ComparisonTable({ comparison, jobId }) {
 }
 
 // --- Job Library & Datasets ---
-function JobLists({ jobs, currentId, onOpen, onRefresh }) {
+function JobLists({ jobs, currentId, onOpen, onRefresh, onDeleteRequest }) {
   const training = useMemo(() => jobs.filter((j) => j.purpose === "training"), [jobs]);
   const transcripts = useMemo(() => jobs.filter((j) => j.purpose !== "training"), [jobs]);
   const [tab, setTab] = useState("transcripts");
@@ -2911,6 +3059,7 @@ function JobLists({ jobs, currentId, onOpen, onRefresh }) {
         jobs={filteredJobs}
         currentId={currentId}
         onOpen={onOpen}
+        onDeleteRequest={onDeleteRequest}
         empty={
           search
             ? "No matching lectures found for this search filter."
@@ -2923,7 +3072,7 @@ function JobLists({ jobs, currentId, onOpen, onRefresh }) {
   );
 }
 
-function JobList({ jobs, currentId, onOpen, empty }) {
+function JobList({ jobs, currentId, onOpen, onDeleteRequest, empty }) {
   const [playingJobAudioId, setPlayingJobAudioId] = useState(null);
   const audioRef = useRef(null);
 
@@ -3005,6 +3154,20 @@ function JobList({ jobs, currentId, onOpen, empty }) {
                     </span>
                   )}
                   <span className={`badge ${j.status}`}>{STAGE_LABELS[j.status] || j.status}</span>
+                  {(j.engine === "local" || j.engine === "both" || j.local_seconds != null) && (j.status === "done" || j.status === "failed") && (
+                    <span
+                      role="button"
+                      tabIndex={0}
+                      className="job-card-delete-btn"
+                      title="Permanently delete this local transcription from the server"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (onDeleteRequest) onDeleteRequest(j);
+                      }}
+                    >
+                      <IconTrash />
+                    </span>
+                  )}
                 </span>
               </span>
               <span className="job-card-meta">{meta.join(" · ")}</span>

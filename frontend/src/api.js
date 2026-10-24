@@ -51,6 +51,8 @@ export function createBatchJobs(urls, keyterms, engine, purpose) {
 }
 
 export const getJob = (id) => request(`/api/jobs/${encodeURIComponent(id)}`);
+export const deleteJob = (id) =>
+  request(`/api/jobs/${encodeURIComponent(id)}`, { method: "DELETE" });
 export const getTranscript = (id) =>
   request(`/api/jobs/${encodeURIComponent(id)}/transcript`);
 export const getComparison = (id) =>

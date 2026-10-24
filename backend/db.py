@@ -110,6 +110,19 @@ def get_job(job_id: str) -> dict | None:
     return dict(row) if row else None
 
 
+def delete_job(job_id: str) -> bool:
+    """Permanently delete a job row from the database.
+
+    Because usage totals are dynamically computed via SQL SUM(duration) and
+    SUM(local_seconds) where status = 'done', deleting this row automatically
+    deducts this lecture's audio time and processing runtime from the local model
+    time counter immediately, as if the lecture was never given to the server.
+    """
+    with _connect() as conn:
+        cursor = conn.execute("DELETE FROM jobs WHERE id = ?", (job_id,))
+        return cursor.rowcount > 0
+
+
 def list_jobs(limit: int = 200, purpose: str | None = None) -> list[dict]:
     """Newest first. Pass purpose='training' or 'transcribe' for one of the two lists."""
     query = "SELECT * FROM jobs"

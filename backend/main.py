@@ -779,6 +779,41 @@ def get_job(job_id: str):
     return public_job(get_job_or_404(job_id))
 
 
+@app.delete("/api/jobs/{job_id}")
+def delete_job_endpoint(job_id: str):
+    """Permanently delete a job, all its audio files, transcripts, clips, and DB records.
+
+    Only jobs in 'done' or 'failed' status can be deleted to prevent interrupting
+    active worker processes. Deleting the record automatically removes its time from
+    the local model time counter.
+    """
+    job = get_job_or_404(job_id)
+    if job["status"] not in ("done", "failed"):
+        raise HTTPException(
+            status_code=409,
+            detail=f"Cannot delete job while it is in '{job['status']}' state. Please wait until it completes or fails."
+        )
+
+    # 1. Remove all files from data/<job_id>
+    folder = job_dir(job_id)
+    if os.path.exists(folder):
+        try:
+            shutil.rmtree(folder, ignore_errors=True)
+        except Exception as e:
+            log.warning("[%s] error removing directory %s: %s", job_id, folder, e)
+
+    # 2. Clear progress file if any
+    clear_progress(job_id)
+
+    # 3. Invalidate word samples cache so deleted job samples are not served
+    _word_samples_cache["indexed_at"] = 0.0
+
+    # 4. Remove database record
+    db.delete_job(job_id)
+    log.info("[%s] permanently deleted job and all server data", job_id)
+    return {"ok": True, "job_id": job_id, "deleted": True}
+
+
 @app.post("/api/jobs/{job_id}/promote")
 def promote_to_training(job_id: str):
     """Turn a finished transcribe-only job into training data.

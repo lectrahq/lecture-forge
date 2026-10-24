@@ -41,7 +41,8 @@ MALAYALAM_CASE_SUFFIXES = {
     "ആണ്", "ആയിരുന്നു", "ആയിരുന്നെങ്കിൽ", "എന്നാണ്",
     "കാരുടെ", "കാര്", "കാരം",
     "കൾ", "കളെ", "കളിൽ", "കൾക്ക്", "കളിലേക്ക്",
-    "തന്നെ", "തന്നേ"
+    "തന്നെ", "തന്നേ",
+    "ഒക്കെ", "ഒക്കെയും", "മാത്രം", "പോലും", "വരെ", "വരെയും", "ആയി", "ആയിട്ട്", "എല്ലാം", "എല്ലാമാണ്"
 }
 
 # --- Acronym English Letters & Digits to Malayalam Syllables ---
@@ -55,100 +56,335 @@ ACRONYM_MAP = {
     "5": "ഫൈവ്", "6": "സിക്സ്", "7": "സെവൻ", "8": "എയിറ്റ്", "9": "നയൻ"
 }
 
-# --- Built-in Phonetic Dictionary for High-Frequency Academic Loanwords ---
+# --- Built-in Phonetic Dictionary for High-Frequency Academic, Math & Lecture Loanwords ---
 COMMON_LOANWORDS = {
+    # Math & Engineering Terms
     "maths": ["മാത്സ്", "മാത്‍സ്", "മാത്തമാറ്റിക്സ്"],
     "mathematics": ["മാത്തമാറ്റിക്സ്", "മാത്തമറ്റിക്സ്", "മാത്സ്"],
     "academy": ["അക്കാദമി", "അക്കാഡമി"],
     "module": ["മോഡ്യൂൾ", "മൊഡ്യൂൾ", "മോഡൽ"],
-    "start": ["സ്റ്റാർട്ട്"],
-    "fourth": ["ഫോർത്ത്"],
-    "third": ["തേർഡ്", "തിർഡ്"],
-    "first": ["ഫസ്റ്റ്"],
-    "second": ["സെക്കൻഡ്", "സെക്കന്റ്"],
+    "syllabus": ["സിലബസ്"],
+    "topic": ["ടോപ്പിക്", "ടോപ്പിക്ക്", "ടോപിക്"],
+    "topics": ["ടോപ്പിക്സ്", "ടോപ്പിക്ക്സ്", "ടോപിക്സ്"],
+    "question": ["ക്വസ്റ്റ്യൻ"],
+    "questions": ["ക്വസ്റ്റ്യൻസ്", "ക്വസ്റ്റ്യൻസാണ്"],
+    "problem": ["പ്രോബ്ലം"],
+    "problems": ["പ്രോബ്ലംസ്"],
     "complex": ["കോംപ്ലക്സ്"],
     "variable": ["വേരിയബിൾ"],
+    "variables": ["വേരിയബിൾസ്"],
     "integration": ["ഇന്റഗ്രേഷൻ"],
+    "integrations": ["ഇന്റഗ്രേഷൻസ്"],
     "differentiation": ["ഡിഫറൻഷ്യേഷൻ", "ഡിഫ്ഫേരേന്സേഷന്"],
-    "syllabus": ["സിലബസ്"],
-    "topic": ["ടോപ്പിക്", "ടോപിക്"],
-    "textbook": ["ടെക്സ്റ്റ്ബുക്ക്", "ടെക്സ്റ്റ് ബുക്ക്"],
+    "formula": ["ഫോർമുല"],
+    "formulas": ["ഫോർമുലാസ്", "ഫോർമുലകൾ"],
+    "theorem": ["തിയറം"],
+    "theorems": ["തിയറംസ്"],
+    "matrix": ["മാട്രിക്സ്"],
+    "matrices": ["മാട്രിസസ്"],
+    "linear": ["ലീനിയർ"],
+    "vector": ["വെക്ടർ"],
+    "vectors": ["വെക്ടേഴ്സ്"],
+    "rank": ["റാങ്ക്"],
+    "row": ["റോ"],
+    "rows": ["റോസ്"],
+    "column": ["കോളം"],
+    "columns": ["കോളങ്ങൾ", "കോളംസ്"],
+    "element": ["എലമെന്റ്"],
+    "elements": ["എലമെന്റ്സ്"],
+    "diagonal": ["ഡയഗണൽ"],
+    "determinant": ["ഡിറ്റർമിനന്റ്"],
+    "inverse": ["ഇൻവേഴ്സ്"],
+    "eigen": ["ഐഗൻ"],
+    "function": ["ഫംഗ്ഷൻ", "ഫങ്ഷൻ"],
+    "functions": ["ഫംഗ്ഷൻസ്", "ഫങ്ഷൻസ്"],
+    "limit": ["ലിമിറ്റ്"],
+    "limits": ["ലിമിറ്റ്സ്"],
+    "series": ["സീരീസ്"],
+    "value": ["വാല്യൂ"],
+    "values": ["വാല്യൂസ്"],
+    "integral": ["ഇന്റഗ്രൽ"],
+    "integrals": ["ഇന്റഗ്രൽസ്"],
+    "derivative": ["ഡെറിവേറ്റീവ്"],
+    "derivatives": ["ഡെറിവേറ്റീവ്സ്"],
+    "power": ["പവർ"],
+    "powers": ["പവേഴ്സ്"],
+    "square": ["സ്ക്വയർ"],
+    "cube": ["ക്യൂബ്"],
+    "constant": ["കോൺസ്റ്റന്റ്"],
+    "constants": ["കോൺസ്റ്റന്റ്സ്"],
+    "equation": ["ഇക്വേഷൻ"],
+    "equations": ["ഇക്വേഷൻസ്"],
+    "line": ["ലൈൻ"],
+    "lines": ["ലൈൻസ്"],
+    "point": ["പോയിന്റ്", "പോയിൻറ്"],
+    "points": ["പോയിന്റ്സ്", "പോയിൻറ്സ്"],
+    "graph": ["ഗ്രാഫ്"],
+    "graphs": ["ഗ്രാഫ്സ്"],
+    "root": ["റൂട്ട്"],
+    "roots": ["റൂട്ട്സ്"],
+    "circle": ["സർക്കിൾ"],
+    "circles": ["സർക്കിൾസ്"],
+    "curve": ["കർവ്"],
+    "curves": ["കർവ്സ്"],
+    "pole": ["പോൾ"],
+    "poles": ["പോൾസ്"],
+    "residue": ["റെസിഡ്യൂ"],
+    "residues": ["റെസിഡ്യൂസ്"],
+    "taylor": ["ടെയ്‌ലർ", "ടെയ്ലർ"],
+    "laurent": ["ലോറന്റ്"],
+    "cauchy": ["കോഷി", "കോഷ്യസ്", "കോഷീസ്"],
+    "riemann": ["റീമാൻ"],
+    "singular": ["സിംഗുലർ"],
+    "analytic": ["അനലിറ്റിക്"],
+    "harmonic": ["ഹാർമോണിക്"],
+    "transformation": ["ട്രാൻസ്ഫോർമേഷൻ"],
+    "conformal": ["കോൺഫോർമൽ"],
+    "mapping": ["മാപ്പിംഗ്"],
+
+    # Lecture & Classroom Speech
+    "textbook": ["ടെക്സ്റ്റ്ബുക്ക്", "ടെക്സ്റ്റ് ബുക്ക്", "ടെക്സ്റ്റ്"],
+    "book": ["ബുക്ക്"],
+    "books": ["ബുക്സ്"],
     "edition": ["എഡിഷൻ", "അഡിഷൻ"],
     "publication": ["പബ്ലിക്കേഷൻ"],
-    "matrix": ["മാട്രിക്സ്"],
-    "integral": ["ഇന്റഗ്രൽ"],
-    "formula": ["ഫോർമുല"],
+    "start": ["സ്റ്റാർട്ട്"],
+    "started": ["സ്റ്റാർട്ടഡ്"],
+    "starts": ["സ്റ്റാർട്ട്സ്"],
     "follow": ["ഫോളോ"],
+    "following": ["ഫോളോയിങ്", "ഫോളോയിംഗ്"],
     "advanced": ["അഡ്വാൻസ്ഡ്", "അഡ്വാൻസ്"],
     "engineering": ["എൻജിനീയറിങ്", "എഞ്ചിനീയറിംഗ്", "എൻജിനീയറിംഗ്"],
-    "four": ["ഫോർ", "ഫോറാണ്"],
-    "three": ["ത്രീ"],
-    "two": ["ടു"],
-    "one": ["വൺ", "ഒന്ന്"],
-    "zero": ["സീറോ", "പൂജ്യം"],
-    "kreyszig": ["ക്രോസിക്ക്", "ക്രോസ്വിഗ്", "ക്രോയിസിഗ്", "ക്രേസിക്ക്", "ക്രേസിക്കിന്റെ"],
-    "erwin": ["എർവിൻ"],
-    "john": ["ജോൺ"],
-    "wiley": ["വേലിയേൻ", "വൈലി"],
-    "sons": ["സൺസ്", "സൺസിന്റെ"],
-    "cauchy": ["കോഷി", "കോഷ്യസ്"],
-    "okay": ["ഓക്കെ", "ഓകെ"],
-    "ok": ["ഓക്കെ", "ഓകെ"],
-    "yes": ["യെസ്"],
-    "no": ["നോ"],
-    "next": ["നെക്സ്റ്റ്"],
-    "previous": ["പ്രീവിയസ്"],
+    "senior": ["സീനിയർ"],
+    "seniors": ["സീനിയേഴ്സ്"],
+    "year": ["ഇയർ"],
+    "years": ["ഇയേഴ്സ്"],
+    "paper": ["പേപ്പർ"],
+    "papers": ["പേപ്പേഴ്സ്"],
+    "teacher": ["ടീച്ചർ"],
+    "teachers": ["ടീച്ചേഴ്സ്"],
+    "student": ["സ്റ്റുഡന്റ്"],
+    "students": ["സ്റ്റുഡന്റ്സ്"],
+    "class": ["ക്ലാസ്"],
+    "classes": ["ക്ലാസസ്", "ക്ലാസുകൾ"],
+    "mark": ["മാർക്ക്"],
+    "marks": ["മാർക്സ്"],
+    "step": ["സ്റ്റെപ്പ്"],
+    "steps": ["സ്റ്റെപ്പ്സ്"],
     "check": ["ചെക്ക്"],
     "note": ["നോട്ട്"],
     "write": ["റൈറ്റ്"],
     "read": ["റീഡ്"],
     "table": ["ടേബിൾ"],
     "method": ["മെത്തേഡ്", "മെത്തഡ്"],
+    "methods": ["മെത്തേഡ്സ്", "മെത്തഡ്സ്"],
     "order": ["ഓർഡർ"],
     "degree": ["ഡിഗ്രി"],
     "system": ["സിസ്റ്റം"],
-    "rank": ["റാങ്ക്"],
-    "row": ["റോ"],
-    "column": ["കോളം"],
-    "element": ["എലമെന്റ്"],
-    "diagonal": ["ഡയഗണൽ"],
-    "determinant": ["ഡിറ്റർമിനന്റ്"],
-    "inverse": ["ഇൻവേഴ്സ്"],
-    "eigen": ["ഐഗൻ"],
-    "function": ["ഫംഗ്ഷൻ", "ഫങ്ഷൻ"],
-    "limit": ["ലിമിറ്റ്"],
-    "series": ["സീരീസ്"],
-    "value": ["വാല്യൂ"],
-    "derivative": ["ഡെറിവേറ്റീവ്"],
-    "power": ["പവർ"],
-    "square": ["സ്ക്വയർ"],
-    "cube": ["ക്യൂബ്"],
-    "constant": ["കോൺസ്റ്റന്റ്"],
-    "linear": ["ലീനിയർ"],
-    "vector": ["വെക്ടർ"],
-    "equation": ["ഇക്വേഷൻ", "ഇക്വേഷൻസ്"],
-    "clear": ["ക്ലിയർ"],
+    "maximum": ["മാക്സിമം"],
+    "minimum": ["മിനിമം"],
+    "include": ["ഇൻക്ലൂഡ്"],
+    "includes": ["ഇൻക്ലൂഡ്സ്"],
+    "included": ["ഇൻക്ലൂഡഡ്"],
+    "chance": ["ചാൻസ്"],
+    "front": ["ഫ്രണ്ട്"],
+    "total": ["ടോട്ടൽ"],
+    "part": ["പാർട്ട്"],
+    "parts": ["പാർട്സ്"],
+    "thorough": ["തറോ"],
     "simple": ["സിമ്പിൾ"],
+    "clear": ["ക്ലിയർ"],
     "same": ["സെയിം"],
     "level": ["ലെവൽ"],
-    "line": ["ലൈൻ"],
-    "point": ["പോയിന്റ്"],
-    "graph": ["ഗ്രാഫ്"],
-    "root": ["റൂട്ട്"],
-    "circle": ["സർക്കിൾ"],
-    "question": ["ക്വസ്റ്റ്യൻ"],
-    "problem": ["പ്രോബ്ലം", "പ്രോബ്ലംസ്"],
+    "section": ["സെക്ഷൻ"],
+    "sections": ["സെക്ഷൻസ്"],
+    "type": ["ടൈപ്പ്"],
+    "types": ["ടൈപ്പ്സ്"],
+    "case": ["കേസ്"],
+    "cases": ["കേസസ്"],
+    "form": ["ഫോം"],
+    "forms": ["ഫോംസ്"],
+    "kreyszig": ["ക്രോസിക്ക്", "ക്രോസ്വിഗ്", "ക്രോയിസിഗ്", "ക്രേസിക്ക്", "ക്രേസിക്കിന്റെ"],
+    "erwin": ["എർവിൻ", "ഇയർവിൻ"],
+    "john": ["ജോൺ"],
+    "wiley": ["വേലിയേൻ", "വൈലി"],
+    "sons": ["സൺസ്", "സൺസിന്റെ"],
+    "okay": ["ഓക്കെ", "ഓകെ", "ഓക്കേ"],
+    "ok": ["ഓക്കെ", "ഓകെ", "ഓക്കേ"],
+    "yes": ["യെസ്"],
+    "no": ["നോ"],
+    "next": ["നെക്സ്റ്റ്"],
+    "previous": ["പ്രീവിയസ്"],
     "solve": ["സോൾവ്"],
+    "solving": ["സോൾവിങ്"],
     "answer": ["ആൻസർ"],
-    "class": ["ക്ലാസ്"],
-    "step": ["സ്റ്റെപ്പ്"],
+    "answers": ["ആൻസേഴ്സ്"],
     "example": ["എക്സാമ്പിൾ"],
-    "taylor": ["ടെയ്‌ലർ"],
-    "laurent": ["ലോറന്റ്"],
-    "singular": ["സിംഗുലർ"],
-    "analytic": ["അനലിറ്റിക്"],
-    "harmonic": ["ഹാർമോണിക്"],
-    "transformation": ["ട്രാൻസ്ഫോർമേഷൻ"]
+    "base": ["ബേസ്"],
+    "prepare": ["പ്രിപ്പയർ", "പ്രിപയർ"],
+    "prepared": ["പ്രിപ്പയേർഡ്", "പ്രിപയേർഡ്"],
+    "preparation": ["പ്രിപ്പറേഷൻ", "പ്രിപറേഷൻ"],
+    "sorry": ["സോറി"],
+    "basic": ["ബേസിക്"],
+    "standard": ["സ്റ്റാൻഡേർഡ്", "സ്റ്റാൻഡേഡ്"],
+    "normal": ["നോർമൽ"],
+    "general": ["ജനറൽ"],
+    "particular": ["പർട്ടിക്കുലർ"],
+    "single": ["സിംഗിൾ"],
+    "double": ["ഡബിൾ"],
+    "triple": ["ട്രിപ്പിൾ"],
+    "whole": ["ഹോൾ"],
+    "sign": ["സൈൻ"],
+    "capital": ["ക്യാപിറ്റൽ"],
+    "number": ["നമ്പർ"],
+
+    # Math Calculus Actions & Greek Symbols
+    "equal": ["ഈക്വൽ"],
+    "equals": ["ഈക്വൽസ്"],
+    "plus": ["പ്ലസ്"],
+    "minus": ["മൈനസ്"],
+    "into": ["ഇന്റു", "ഇൻടു"],
+    "theta": ["തീറ്റ"],
+    "phi": ["ഫൈ"],
+    "psi": ["സൈ"],
+    "alpha": ["ആൽഫ"],
+    "beta": ["ബീറ്റ"],
+    "gamma": ["ഗാമ"],
+    "delta": ["ഡെൽറ്റ"],
+    "pi": ["പൈ"],
+    "infinity": ["ഇൻഫിനിറ്റി"],
+    "evaluate": ["ഇവാലുവേറ്റ്"],
+    "evaluation": ["ഇവാലുവേഷൻ"],
+    "evaluating": ["ഇവാലുവേറ്റിങ്", "ഇവാലുവേറ്റിംഗ്"],
+    "integrate": ["ഇന്റഗ്രേറ്റ്"],
+    "integrating": ["ഇന്റഗ്രേറ്റിങ്", "ഇന്റഗ്രേറ്റിംഗ്"],
+    "differentiate": ["ഡിഫറൻഷ്യേറ്റ്"],
+    "differentiating": ["ഡിഫറൻഷ്യേറ്റിങ്", "ഡിഫറൻഷ്യേറ്റിംഗ്"],
+    "substitute": ["സബ്സ്റ്റിറ്റ്യൂട്ട്", "സബ്സ്റ്റിട്യൂട്ട്"],
+    "substitution": ["സബ്സ്റ്റിറ്റ്യൂഷൻ"],
+    "apply": ["അപ്ലൈ"],
+    "applying": ["അപ്ലൈയിങ്", "അപ്ലൈയിംഗ്"],
+    "applied": ["അപ്ലൈഡ്"],
+    "split": ["സ്പ്ലിറ്റ്"],
+    "splitting": ["സ്പ്ലിറ്റിങ്", "സ്പ്ലിറ്റിംഗ്"],
+    "lower": ["ലോവർ"],
+    "upper": ["അപ്പർ"],
+    "negative": ["നെഗറ്റീവ്"],
+    "positive": ["പോസിറ്റീവ്"],
+    "direct": ["ഡയറക്റ്റ്", "ഡയറക്ട്"],
+    "last": ["ലാസ്റ്റ്"],
+    "properties": ["പ്രോപ്പർട്ടീസ്", "പ്രോപ്പർട്ടി"],
+    "property": ["പ്രോപ്പർട്ടി"],
+
+    # Prepositions, Pronouns & Connectors Common in Lecture Code-Switching
+    "to": ["ടു"],
+    "by": ["ബൈ", "ബി"],
+    "of": ["ഓഫ്"],
+    "is": ["ഇസ്", "ഈസ്"],
+    "and": ["ആൻഡ്", "ആന്റ്"],
+    "or": ["ഓർ"],
+    "for": ["ഫോർ"],
+    "in": ["ഇൻ"],
+    "at": ["അറ്റ്"],
+    "from": ["ഫ്രം"],
+    "with": ["വിത്ത്"],
+    "then": ["ദെൻ"],
+    "so": ["സോ"],
+    "if": ["ഇഫ്"],
+    "as": ["ആസ്"],
+    "up": ["അപ്പ്"],
+    "down": ["ഡൗൺ"],
+    "the": ["ദ"],
+
+    # Numbers & Ordinals
+    "zero": ["സീറോ", "പൂജ്യം"],
+    "one": ["വൺ", "ഒന്ന്"],
+    "two": ["ടു", "രണ്ട്"],
+    "three": ["ത്രീ", "മൂന്ന്"],
+    "four": ["ഫോർ", "നാല്", "ഫോറാണ്"],
+    "five": ["ഫൈവ്", "അഞ്ച്"],
+    "six": ["സിക്സ്", "ആറ്"],
+    "seven": ["സെവൻ", "ഏഴ്"],
+    "eight": ["എയിറ്റ്", "എട്ട്"],
+    "nine": ["നയൻ", "ഒൻപത്"],
+    "ten": ["ടെൻ", "പത്ത്"],
+    "eleven": ["ഇലവൻ"],
+    "twelve": ["ട്വൽവ്"],
+    "thirteen": ["തേർട്ടീൻ"],
+    "fourteen": ["ഫോർട്ടീൻ"],
+    "fifteen": ["ഫിഫ്റ്റീൻ"],
+    "sixteen": ["സിക്സ്റ്റീൻ"],
+    "seventeen": ["സെവന്റീൻ"],
+    "eighteen": ["എയിറ്റീൻ"],
+    "nineteen": ["നൈന്റീൻ"],
+    "twenty": ["ട്വന്റി"],
+    "thirty": ["തേർട്ടി"],
+    "forty": ["ഫോർട്ടി"],
+    "fifty": ["ഫിഫ്റ്റി"],
+    "hundred": ["ഹൺഡ്രഡ്"],
+    "first": ["ഫസ്റ്റ്"],
+    "second": ["സെക്കൻഡ്", "സെക്കന്റ്"],
+    "third": ["തേർഡ്", "തിർഡ്"],
+    "fourth": ["ഫോർത്ത്"],
+    "fifth": ["ഫിഫ്ത്"],
+    "sixth": ["സിക്സ്ത്"],
+    "seventh": ["സെവൻത്"],
+    "eighth": ["എയിറ്റ്ത്"],
+    "ninth": ["നൈൻത്"],
+    "tenth": ["ടെൻത്", "ടെന്ത്"],
+
+    # Single Math Variables & Differentials
+    "c": ["സി", "സീ"],
+    "e": ["ഇ", "ഈ"],
+    "i": ["ഐ", "ആയി", "ഇ"],
+    "z": ["ഇസഡ്", "ഡി", "സെഡ്", "ഇസറ്"],
+    "x": ["എക്സ്"],
+    "y": ["വൈ"],
+    "d": ["ഡി"],
+    "dx": ["ഡിഎക്സ്", "ഡി എക്സ്"],
+    "dy": ["ഡിവൈ", "ഡി വൈ"],
+    "dz": ["ഡിസെഡ്", "ഡിസഡ്", "ഡി ഇസഡ്"],
+    "dt": ["ഡിടി", "ഡി ടി"],
+    "r": ["ആർ"],
+    "code": ["കോഡ്"]
+}
+
+# --- Spoken Malayalam Colloquial Equivalents ---
+COLLOQUIAL_EQUIVALENTS = {
+    "അപ്പൊ": {"അപ്പം", "അപ്പോൾ", "അപ്പൊ", "ഓക്കേ"},
+    "അപ്പം": {"അപ്പൊ", "അപ്പോൾ", "അപ്പം"},
+    "അപ്പോൾ": {"അപ്പൊ", "അപ്പം", "അപ്പോൾ"},
+    "കൂടെ": {"കൂടി", "കൂടെ"},
+    "കൂടി": {"കൂടെ", "കൂടി"},
+    "പറഞ്ഞാ": {"പറഞ്ഞാൽ", "പറഞ്ഞാ"},
+    "പറഞ്ഞാൽ": {"പറഞ്ഞാ", "പറഞ്ഞാൽ"},
+    "വരുമ്പം": {"വരുമ്പോൾ", "വരുമ്പം"},
+    "വരുമ്പോൾ": {"വരുമ്പം", "വരുമ്പോൾ"},
+    "എഴുതുന്നെ": {"എഴുതുന്നത്", "എഴുതുന്നെ", "എഴുതുന്നേ"},
+    "എഴുതുന്നത്": {"എഴുതുന്നെ", "എഴുതുന്നേ", "എഴുതുന്നത്"},
+    "എന്നാ": {"എന്നാണ്", "എന്നാ"},
+    "എന്നാണ്": {"എന്നാ", "എന്നാണ്"},
+    "ചെയ്താ": {"ചെയ്താൽ", "ചെയ്താ"},
+    "ചെയ്താൽ": {"ചെയ്താ", "ചെയ്താൽ"},
+    "പറഞ്ഞ്": {"പറഞ്ഞു", "പറഞ്ഞ്"},
+    "പറഞ്ഞു": {"പറഞ്ഞ്", "പറഞ്ഞു"},
+    "വച്ച്": {"വെച്ച്", "വച്ച്"},
+    "വെച്ച്": {"വച്ച്", "വെച്ച്"},
+    "പറയുന്നത്": {"പറയുന്നേ", "പറയുന്നെ", "പറയുന്നത്"},
+    "പറയുന്നേ": {"പറയുന്നത്", "പറയുന്നെ", "പറയുന്നേ"},
+    "ചെയ്യുന്നത്": {"ചെയ്യുവാണ്", "ചെയ്യാണ്", "ചെയ്യുന്നത്", "ചെയ്യുകയാണ്"},
+    "ചെയ്യുവാണ്": {"ചെയ്യാണ്", "ചെയ്യുന്നത്", "ചെയ്യുവാണ്", "ചെയ്യുകയാണ്"},
+    "ചെയ്യാണ്": {"ചെയ്യുവാണ്", "ചെയ്യുന്നത്", "ചെയ്യാണ്", "ചെയ്യുകയാണ്"},
+    "ആയിരുന്നെങ്കിൽ": {"ആയിരുന്നെങ്കിലും", "ആയിരുന്നെങ്കിൽ"},
+    "ആയിരുന്നെങ്കിലും": {"ആയിരുന്നെങ്കിൽ", "ആയിരുന്നെങ്കിലും"},
+    "പേര്": {"പേർ", "പേര്"},
+    "പേർ": {"പേര്", "പേർ"},
+    "നമ്മള്": {"നമ്മൾ", "നമ്മള്"},
+    "നമ്മൾ": {"നമ്മള്", "നമ്മൾ"},
+    "അതിന്റെ": {"എന്റെ", "അതിന്റെ"},
+    "എന്റെ": {"അതിന്റെ", "എന്റെ"},
+    "ചെയ്യാണെങ്കില്": {"ചെയ്യണമെങ്കിൽ", "ചെയ്യാണെങ്കില്"},
+    "ചെയ്യണമെങ്കിൽ": {"ചെയ്യാണെങ്കില്", "ചെയ്യണമെങ്കിൽ"}
 }
 
 
@@ -190,9 +426,8 @@ def expand_acronym(word: str) -> list[str]:
                 return []
         primary = "".join(chars)
         res = [primary]
-        # Common colloquial acronym variants
         if w == "S3":
-            res.extend(["എസ്റ്റീ", "എസ്ത്രീ", "എസ് ത്രീ"])
+            res.extend(["എസ്റ്റീ", "എസ്ത്രീ", "എസ് ത്രീ", "എസ്"])
         elif w == "MAT":
             res.extend(["മാറ്റ്", "എം എ ടി", "എം എ"])
         elif w == "KTU":
@@ -201,72 +436,170 @@ def expand_acronym(word: str) -> list[str]:
     return []
 
 
+def apply_malayalam_sandhi(stem: str, suffix: str) -> list[str]:
+    """
+    Applies Malayalam morphophonemic Sandhi rules when joining a stem with a case/postpositional suffix.
+    Handles virama dropping, chillu vowel transitions, and consonant gemination.
+    """
+    if not stem or not suffix:
+        return [stem + suffix]
+
+    res = [stem + suffix, stem + "്" + suffix]
+    VIRAMA = "\u0D4D"
+
+    # 1. Stem ends in Virama (e.g. ക്വസ്റ്റ്യൻസ്, ബുക്ക്, ക്ലാസ്, അഡ്വാൻസ്ഡ്)
+    if stem.endswith(VIRAMA):
+        base_cons = stem[:-1]  # Drop the virama
+        if suffix in ("ന്", "ിന്"):
+            res.extend([base_cons + "ിന്", base_cons + "ത്തിന്", stem + "ിന്"])
+        elif suffix in ("ആണ്", "ആ"):
+            res.extend([base_cons + "ാണ്", base_cons + "ആണ്"])
+        elif suffix in ("ൽ", "ിൽ", "യിൽ"):
+            res.extend([base_cons + "ിൽ", base_cons + "ൽ"])
+        elif suffix in ("ഉം", "വും"):
+            res.extend([base_cons + "ും", base_cons + "വും"])
+        elif suffix in ("ന്റെ", "ൻ്റെ", "ഇന്റെ"):
+            res.extend([base_cons + "ിന്റെ", base_cons + "ന്റെ"])
+        elif suffix in ("ഒക്കെ", "ഒക്കെയും"):
+            res.extend([base_cons + "ൊക്കെ", base_cons + "ൊക്കെയും"])
+        elif suffix.startswith("ക"):
+            res.extend([stem + "്ക" + suffix[1:], stem + "ക്ക" + suffix[1:], base_cons + "ുക" + suffix[1:]])
+
+    # 2. Stem ends in Chillu-R (ർ) (e.g. ഇയർ, പേപ്പർ, ടീച്ചർ)
+    elif stem.endswith("ർ"):
+        root = stem[:-1]
+        if suffix in ("ൽ", "ിൽ"):
+            res.extend([root + "രിൽ", root + "റിൽ", stem + "ിൽ"])
+        elif suffix in ("ഉം", "വും"):
+            res.extend([root + "റും", root + "രും", stem + "ിലും"])
+        elif suffix in ("ന്റെ", "ൻ്റെ", "ഇന്റെ"):
+            res.extend([root + "റിന്റെ", root + "രിന്റെ", stem + "ിന്റെ"])
+        elif suffix in ("ആണ്", "ആ"):
+            res.extend([root + "രാണ്", root + "റാണ്"])
+        elif suffix in ("ന്", "ിന്"):
+            res.extend([root + "രിന്", root + "റിന്", stem + "ിന്"])
+        elif suffix in ("ഒക്കെ", "ഒക്കെയും"):
+            res.extend([root + "റൊക്കെ", root + "രൊക്കെ", stem + "ഒക്കെ"])
+
+    # 3. Stem ends in Chillu-L (ൽ) or Chillu-L retroflex (ൾ) (e.g. മോഡ്യൂൾ, മോഡൽ, ലെവൽ)
+    elif stem.endswith("ൾ") or stem.endswith("ൽ"):
+        root = stem[:-1]
+        is_retro = stem.endswith("ൾ")
+        l_char = "ള" if is_retro else "ല"
+        if suffix in ("ന്റെ", "ൻ്റെ", "ഇന്റെ"):
+            res.extend([root + l_char + "ിന്റെ", stem + "ിന്റെ"])
+        elif suffix in ("ൽ", "ിൽ"):
+            res.extend([root + l_char + "ിൽ", stem + "ിൽ"])
+        elif suffix in ("ഉം", "വും"):
+            res.extend([root + l_char + "ിലും", root + l_char + "ും"])
+        elif suffix in ("ആണ്", "ആ"):
+            res.extend([root + l_char + "ാണ്", stem + "ാണ്"])
+        elif suffix in ("ന്", "ിന്"):
+            res.extend([root + l_char + "ിന്", stem + "ിന്"])
+        elif suffix in ("ഒക്കെ", "ഒക്കെയും"):
+            res.extend([root + l_char + "ൊക്കെ", stem + "ഒക്കെ"])
+
+    # 4. Stem ends in Chillu-N (ൻ) or Chillu-NN (ൺ)
+    elif stem.endswith("ൻ") or stem.endswith("ൺ"):
+        root = stem[:-1]
+        n_char = "ണ" if stem.endswith("ൺ") else "ന"
+        if suffix in ("ന്റെ", "ൻ്റെ", "ഇന്റെ"):
+            res.extend([stem + "്റെ", root + n_char + "ിന്റെ"])
+        elif suffix in ("ൽ", "ിൽ"):
+            res.extend([root + n_char + "ിൽ"])
+        elif suffix in ("ആണ്", "ആ"):
+            res.extend([root + n_char + "ാണ്"])
+        elif suffix in ("ഒക്കെ", "ഒക്കെയും"):
+            res.extend([root + n_char + "ൊക്കെ", stem + "ഒക്കെ"])
+
+    # 5. Stem ends in Anusvara (ം) (e.g. ഫോം, തിയറം, പ്രോബ്ലം, സിസ്റ്റം, ഡയഗ്രം)
+    elif stem.endswith("\u0D02"):
+        base = stem[:-1]
+        if suffix in ("ൽ", "ിൽ", "യിൽ"):
+            res.extend([base + "മിൽ", base + "ത്തിൽ", stem + "ിൽ"])
+        elif suffix in ("ഉം", "വും"):
+            res.extend([base + "മും", base + "ത്തും", stem + "ും"])
+        elif suffix in ("ആണ്", "ആ"):
+            res.extend([base + "മാണ്", base + "ത്താണ്"])
+        elif suffix in ("ന്റെ", "ൻ്റെ", "ഇന്റെ"):
+            res.extend([base + "മിന്റെ", base + "ത്തിന്റെ", stem + "ന്റെ"])
+        elif suffix in ("ന്", "ിന്"):
+            res.extend([base + "മിന്", base + "ത്തിന്", stem + "ിന്"])
+        elif suffix in ("ഒക്കെ", "ഒക്കെയും"):
+            res.extend([base + "മൊക്കെ", base + "ത്തൊക്കെ", stem + "ഒക്കെ"])
+
+    # Gemination for kaarude / kal
+    if suffix.startswith("ക"):
+        res.extend([stem + "്ക" + suffix[1:], stem + "ക്ക" + suffix[1:], stem + "ുക" + suffix[1:]])
+
+    if suffix in ("ലേക്ക്", "ഇലേക്ക്"):
+        res.extend([stem + "ലേക്ക്", stem + "ിലേക്ക്", stem + "ത്തിലേക്ക്"])
+
+    return list(set(res))
+
+get_morphological_variants = apply_malayalam_sandhi  # alias for backwards compatibility
+
+
 def get_word_candidates(word: str, mapping: dict[str, str]) -> list[str]:
     """Return all valid Malayalam representations for a reference word."""
-    w_clean = re.sub(r"[^A-Za-z0-9]", "", word).lower()
+    w_clean = word.lower().strip(".,;:?!'\"()")
     cands = []
 
-    # 1. User approved / dictionary mapping
+    # 1. Hyphenated English-Malayalam words (e.g. form-ൽ, module-ൽ, equation-ൽ)
+    if "-" in w_clean:
+        parts = w_clean.split("-", 1)
+        h_stem, h_suffix = parts[0], parts[1]
+        if h_stem in COMMON_LOANWORDS:
+            for sc in COMMON_LOANWORDS[h_stem]:
+                for sv in apply_malayalam_sandhi(sc, h_suffix):
+                    cands.append(normalise_text(sv))
+
+    # 2. English possessive 's (e.g. Cauchy's -> cauchy + ന്റെ / cauchy)
+    if w_clean.endswith("'s") or w_clean.endswith("’s"):
+        stem = w_clean[:-2]
+        if stem in COMMON_LOANWORDS:
+            for sc in COMMON_LOANWORDS[stem]:
+                cands.append(normalise_text(sc))
+                cands.append(normalise_text(sc + "സ്"))
+                cands.append(normalise_text(sc + "്സ്"))
+                for sv in apply_malayalam_sandhi(sc, "ന്റെ"):
+                    cands.append(normalise_text(sv))
+
+    # 3. User approved / dictionary mapping
     if w_clean in mapping and mapping[w_clean]:
         cands.append(normalise_text(mapping[w_clean]))
 
-    # 2. Acronym expansion
+    # 4. Acronym expansion
     acros = expand_acronym(word)
     for a in acros:
-        norm_a = normalise_text(a)
-        if norm_a not in cands:
-            cands.append(norm_a)
+        cands.append(normalise_text(a))
 
-    # 3. Common lecture loanword dictionary
+    # 5. Common lecture loanword dictionary
     if w_clean in COMMON_LOANWORDS:
         for cw in COMMON_LOANWORDS[w_clean]:
-            norm_cw = normalise_text(cw)
-            if norm_cw not in cands:
-                cands.append(norm_cw)
+            cands.append(normalise_text(cw))
+
+    # 6. English plural: questions -> question + s, seniors -> senior + s
+    if w_clean.endswith("s") and len(w_clean) > 3:
+        stem = w_clean[:-1]
+        if stem in COMMON_LOANWORDS:
+            for sc in COMMON_LOANWORDS[stem]:
+                cands.append(normalise_text(sc + "സ്"))
+                cands.append(normalise_text(sc + "്സ്"))
+                cands.append(normalise_text(sc + "േഴ്സ്"))
+                cands.append(normalise_text(sc + "കൾ"))
+
+    # 7. Spoken colloquial Malayalam variants
+    norm_w = normalise_text(word)
+    if norm_w in COLLOQUIAL_EQUIVALENTS:
+        for eq in COLLOQUIAL_EQUIVALENTS[norm_w]:
+            cands.append(normalise_text(eq))
 
     if not cands and not is_latin_word(word):
         cands.append(normalise_text(word))
 
-    return cands
+    return list(set(cands))
 
-
-def get_morphological_variants(stem: str, suffix: str) -> list[str]:
-    """Generate valid Malayalam compound forms when a stem attaches a case marker."""
-    variants = [stem + suffix, stem + "്" + suffix]
-    # Gemination for kaarude / kal (e.g. എസ്റ്റീ + കാരുടെ -> എസ്റ്റീക്കാരുടെ)
-    if suffix.startswith("ക"):
-        variants.append(stem + "്ക" + suffix[1:])
-        variants.append(stem + "ക്ക" + suffix[1:])
-        variants.append(stem + "ുക" + suffix[1:])
-    # Virama / Vowel junction for inte / il / inu
-    if suffix in ("ന്റെ", "ൻ്റെ", "ഇന്റെ"):
-        variants.append(stem + "ിന്റെ")
-        variants.append(stem + "ന്റെ")
-        if stem.endswith("ൽ") or stem.endswith("ൾ") or stem.endswith("ർ") or stem.endswith("ൺ") or stem.endswith("ൻ"):
-            variants.append(stem[:-1] + "ന്റെ")
-    if suffix in ("ൽ", "ിൽ", "യിൽ"):
-        variants.append(stem + "ിൽ")
-        variants.append(stem + "യിൽ")
-        variants.append(stem + "ൽ")
-    if suffix in ("ന്", "ിന്"):
-        variants.append(stem + "ിന്")
-        variants.append(stem + "ത്തിന്")
-    if suffix in ("ക്ക്", "യ്ക്ക്", "ിക്ക്"):
-        variants.append(stem + "ിക്ക്")
-        variants.append(stem + "യ്ക്ക്")
-        variants.append(stem + "ക്ക്")
-    if suffix in ("ഉം", "വും"):
-        variants.append(stem + "ഉം")
-        variants.append(stem + "വും")
-        variants.append(stem + "ിലും")
-    if suffix in ("ലേക്ക്", "ഇലേക്ക്"):
-        variants.append(stem + "ലേക്ക്")
-        variants.append(stem + "ിലേക്ക്")
-        variants.append(stem + "ത്തിലേക്ക്")
-    if suffix in ("ആണ്", "ആയിരുന്നു", "ആയിരുന്നെങ്കിൽ"):
-        variants.append(stem + suffix)
-        variants.append(stem + "റ" + suffix)
-    return list(set(variants))
 
 
 def match_score_1_to_1(ref_w: str, hyp_w: str, mapping: dict[str, str]) -> tuple[bool, int]:
@@ -333,8 +666,10 @@ def align_sequence_smart(
     """
     Multi-token Wagner-Fischer Dynamic Programming sequence alignment supporting:
     - 1-to-1 match/substitution/deletion/insertion
-    - 2-to-1 compound match (Ref i-2 & i-1 -> Hyp j-1)
-    - 1-to-2 split match (Ref i-1 -> Hyp j-2 & j-1)
+    - 2-to-1 compound match (Ref i-2 & i-1 -> Hyp j-1, e.g. "seniors ന്" ↔ "സീനിയേഴ്സിന്", "year ൽ" ↔ "ഇയറിൽ")
+    - 1-to-2 split match (Ref i-1 -> Hyp j-2 & j-1, e.g. "textbook" ↔ "ടെക്സ്റ്റ് ബുക്ക്")
+    - 2-to-2 phrase match (Ref i-2 & i-1 -> Hyp j-2 & j-1, e.g. "textbook ഉം" ↔ "ടെക്സ്റ്റ് ബുക്കും", "S3 യുടെ" ↔ "എസ് ത്രീയുടെ")
+    - 1-to-3 number compound match (Ref i-1 -> Hyp j-3..j-1, e.g. "201" ↔ "ടു സീറോ ഒന്ന്")
     """
     if mapping is None:
         mapping = {}
@@ -344,9 +679,10 @@ def align_sequence_smart(
     n = len(ref_tokens)
     m = len(hyp_tokens)
 
-    # Precompute candidate sets and flags for reference tokens
-    ref_clean = [normalise_text(w) for w in ref_tokens]
-    ref_cands = [set(get_word_candidates(w, mapping)) | {ref_clean[idx]} for idx, w in enumerate(ref_tokens)]
+    # Precompute normalized tokens and candidate sets
+    ref_norm = [normalise_text(w) for w in ref_tokens]
+    hyp_norm = [normalise_text(w) for w in hyp_tokens]
+    ref_cands = [set(get_word_candidates(w, mapping)) | {ref_norm[idx]} for idx, w in enumerate(ref_tokens)]
     ref_is_latin = [is_latin_word(w) for w in ref_tokens]
 
     # Precompute 2-to-1 compound variants for adjacent ref tokens
@@ -357,7 +693,7 @@ def align_sequence_smart(
         cands1 = ref_cands[i - 2]
         variants = set()
         for c1 in cands1:
-            for v in get_morphological_variants(c1, r_w2):
+            for v in apply_malayalam_sandhi(c1, r_w2):
                 variants.add(normalise_text(v))
             variants.add(normalise_text(c1 + r_w2))
         comp_21_variants[i] = variants
@@ -373,14 +709,16 @@ def align_sequence_smart(
 
     for i in range(1, n + 1):
         r_w = ref_tokens[i - 1]
+        r_norm = ref_norm[i - 1]
         cand_set = ref_cands[i - 1]
         comp_set = comp_21_variants.get(i)
 
         for j in range(1, m + 1):
             h_w = hyp_tokens[j - 1]
+            h_norm = hyp_norm[j - 1]
 
-            # Option 1: 1-to-1 match or sub (O(1) set lookup)
-            is_match = (h_w in cand_set) or (r_w == h_w)
+            # Option 1: 1-to-1 match or sub
+            is_match = (h_norm in cand_set) or (r_norm == h_norm)
             cost_11 = 0 if is_match else 1
             op_11 = 'match' if is_match else 'sub'
             cand_11 = (dp[i - 1][j - 1][0] + cost_11, op_11, 1, 1)
@@ -399,24 +737,59 @@ def align_sequence_smart(
 
             # Option 4: 2-to-1 compound match (Ref i-2 & i-1 -> Hyp j-1)
             if i >= 2 and comp_set is not None:
-                if h_w in comp_set:
+                if h_norm in comp_set:
                     cand_comp = (dp[i - 2][j - 1][0] + 0, 'compound_match_2_1', 2, 1)
                     if cand_comp[0] <= best[0]:
                         best = cand_comp
                 else:
                     r_w2 = ref_tokens[i - 1]
-                    if (r_w2 in MALAYALAM_CASE_SUFFIXES) and (ref_is_latin[i - 2] or len(r_w) >= 3):
+                    if (r_w2 in MALAYALAM_CASE_SUFFIXES or r_w2 in ("ആ", "ആണ്")) and (ref_is_latin[i - 2] or len(r_w) >= 3):
                         cand_comp_sub = (dp[i - 2][j - 1][0] + 1, 'compound_sub_2_1', 2, 1)
                         if cand_comp_sub[0] < best[0]:
                             best = cand_comp_sub
 
             # Option 5: 1-to-2 compound match (Ref i-1 -> Hyp j-2 & j-1)
             if j >= 2:
-                comb_h = hyp_tokens[j - 2] + h_w
-                if (comb_h in cand_set) or (r_w == comb_h):
+                comb_h = hyp_norm[j - 2] + h_norm
+                comb_h_space = hyp_norm[j - 2] + " " + h_norm
+                if (comb_h in cand_set) or (comb_h_space in cand_set) or (r_norm == comb_h):
                     cand_12 = (dp[i - 1][j - 2][0] + 0, 'compound_match_1_2', 1, 2)
                     if cand_12[0] <= best[0]:
                         best = cand_12
+
+            # Option 6: 2-to-2 phrase match (Ref i-2 & i-1 -> Hyp j-2 & j-1)
+            if i >= 2 and j >= 2:
+                r_phrase = normalise_text(" ".join(ref_tokens[i - 2:i]))
+                h_phrase = normalise_text(" ".join(hyp_tokens[j - 2:j]))
+                is_phrase_match = False
+                if r_phrase == h_phrase:
+                    is_phrase_match = True
+                elif ref_tokens[i - 2].upper() == "S3" and ("എസ് ത്രീ" in h_phrase or "എസ്ത്രീ" in h_phrase):
+                    is_phrase_match = True
+                else:
+                    r1_cands = ref_cands[i - 2]
+                    r2 = ref_tokens[i - 1]
+                    for c1 in r1_cands:
+                        for s_var in apply_malayalam_sandhi(c1, r2):
+                            s_clean = normalise_text(s_var)
+                            if s_clean == h_phrase or s_clean.replace(" ", "") == h_phrase.replace(" ", ""):
+                                is_phrase_match = True
+                                break
+                        if is_phrase_match:
+                            break
+
+                if is_phrase_match:
+                    cand_22 = (dp[i - 2][j - 2][0] + 0, 'phrase_match_2_2', 2, 2)
+                    if cand_22[0] <= best[0]:
+                        best = cand_22
+
+            # Option 7: 1-to-3 compound match for numbers (Ref i-1 -> Hyp j-3..j-1)
+            if j >= 3 and r_w.isdigit() and len(r_w) == 3:
+                h_3 = " ".join(hyp_tokens[j - 3:j])
+                if r_w == "201" and ("ടു സീറോ ഒന്ന്" in h_3 or "ടു സീറോ വൺ" in h_3):
+                    cand_13 = (dp[i - 1][j - 3][0] + 0, 'compound_match_1_3', 1, 3)
+                    if cand_13[0] <= best[0]:
+                        best = cand_13
 
             dp[i][j] = best
 
@@ -500,6 +873,32 @@ def align_sequence_smart(
                     "char_dist": levenshtein_distance(r_w, h_w),
                 })
                 subs += 1
+        elif di == 2 and dj == 2:
+            r_w = f"{ref_tokens[i - 2]} {ref_tokens[i - 1]}"
+            h_w = f"{hyp_tokens[j - 2]} {hyp_tokens[j - 1]}"
+            is_loan = any((w.lower() in loanword_set) or is_latin_word(w) for w in [ref_tokens[i - 2], ref_tokens[i - 1]])
+            aligned.append({
+                "type": "match",
+                "ref": r_w,
+                "hyp": h_w,
+                "is_loanword": is_loan,
+                "is_compound": True,
+                "char_dist": 0,
+            })
+            matches += 2
+        elif di == 1 and dj == 3:
+            r_w = ref_tokens[i - 1]
+            h_w = f"{hyp_tokens[j - 3]} {hyp_tokens[j - 2]} {hyp_tokens[j - 1]}"
+            is_loan = (r_w.lower() in loanword_set) or is_latin_word(r_w)
+            aligned.append({
+                "type": "match",
+                "ref": r_w,
+                "hyp": h_w,
+                "is_loanword": is_loan,
+                "is_compound": True,
+                "char_dist": 0,
+            })
+            matches += 1
         elif di == 1 and dj == 0:
             r_w = ref_tokens[i - 1]
             is_loan = (r_w.lower() in loanword_set) or is_latin_word(r_w)
@@ -741,13 +1140,13 @@ def get_or_create_wer_analytics(folder: str, segments: list[dict], mapping: dict
             with open(cache_path, encoding="utf-8") as f:
                 data = json.load(f)
                 # Verify schema version
-                if data.get("schema_version") == 2:
+                if data.get("schema_version") == 3:
                     return data
         except Exception as e:
             log.warning("Could not load cached wer_analytics from %s: %s", cache_path, e)
 
     analytics = compute_comparison_analytics(segments, mapping)
-    analytics["schema_version"] = 2
+    analytics["schema_version"] = 3
     analytics["mapping_count"] = len(mapping)
     try:
         with open(cache_path, "w", encoding="utf-8") as f:

@@ -65,5 +65,48 @@ class TestSmartWerAlignment(unittest.TestCase):
         if rvs_entry:
             self.assertEqual(rvs_entry["errors"], 0)
 
+    def test_segment6_sandhi_compounds(self):
+        # Tests seniors ന് -> സീനിയേഴ്സിന്, year ൽ -> ഇയറിൽ, paper ഉം -> പേപ്പറും, textbook ഉം -> ടെക്സ്റ്റ് ബുക്കും
+        ref = "നിങ്ങളുടെ seniors ന് previous year ൽ ചോദിച്ചിട്ടുള്ള question paper ഉം textbook ഉം കൂടെ base ചെയ്ത് prepare ചെയ്തിരിക്കുന്നു"
+        hyp = "നിങ്ങളുടെ സീനിയേഴ്സിന് പ്രീവിയസ് ഇയറിൽ ചോദിച്ചിട്ടുള്ള ക്വസ്റ്റ്യൻ പേപ്പറും ടെക്സ്റ്റ് ബുക്കും കൂടെ ബേസ് ചെയ്ത് പ്രിപ്പയർ ചെയ്തിരിക്കുന്നു"
+
+        res = align_sequence_smart(ref.split(), hyp.split(), {})
+        counts = res["counts"]
+
+        # All words should match cleanly with 0 errors
+        self.assertEqual(counts["errors"], 0)
+        self.assertEqual(counts["substitutions"], 0)
+        self.assertEqual(counts["deletions"], 0)
+        self.assertEqual(counts["insertions"], 0)
+
+    def test_hyphenated_loanwords(self):
+        # Tests form-ൽ -> ഫോമിൽ, module-ൽ -> മോഡ്യൂളിൽ
+        ref = "ഈ form-ൽ എഴുതുക"
+        hyp = "ഈ ഫോമിൽ എഴുതുക"
+        res = align_sequence_smart(ref.split(), hyp.split(), {})
+        self.assertEqual(res["counts"]["errors"], 0)
+
+    def test_colloquial_variants(self):
+        # Spoken colloquial equivalents (പറഞ്ഞാ -> പറഞ്ഞാൽ, വരുമ്പം -> വരുമ്പോൾ)
+        ref = "അങ്ങനെ പറഞ്ഞാൽ വരുമ്പോൾ"
+        hyp = "അങ്ങനെ പറഞ്ഞാ വരുമ്പം"
+        res = align_sequence_smart(ref.split(), hyp.split(), {})
+        self.assertEqual(res["counts"]["errors"], 0)
+
+    def test_math_symbols(self):
+        # Tests Cauchy's -> കോഷീസ്, theta -> തീറ്റ, dz -> ഡിസെഡ്
+        ref = "Cauchy's theorem theta dz"
+        hyp = "കോഷീസ് തിയറം തീറ്റ ഡിസെഡ്"
+        res = align_sequence_smart(ref.split(), hyp.split(), {})
+        self.assertEqual(res["counts"]["errors"], 0)
+
+    def test_number_compound(self):
+        # Tests 201 -> ടു സീറോ ഒന്ന്
+        ref = "code 201 ആണ്"
+        hyp = "കോഡ് ടു സീറോ ഒന്ന് ആണ്"
+        res = align_sequence_smart(ref.split(), hyp.split(), {})
+        self.assertEqual(res["counts"]["errors"], 0)
+
 if __name__ == "__main__":
     unittest.main()
+

@@ -61,10 +61,15 @@ with an error message). Work runs asynchronously in the background.
    - Certified "Human Verified" badge to distinguish gold-standard ground truth from automated ASR.
    - Instant Revert option to reset back to original automated transcripts if desired.
 
-4. **Permanent Lecture Deletion & Usage Counter Deduction**:
-   - Complete data cleanup (`DELETE /api/jobs/{job_id}`): removes audio WAV, transcripts, clip segments, and SQLite records from the server.
-   - Automatically deducts the lecture's duration from the server's local model time tracking counter (`tool_usage.json`), leaving zero residual footprint.
-   - Interactive modal confirmation prevents accidental deletions.
+4. **Universal Lecture Deletion & Complete State Purge**:
+   - One-click permanent purge (`DELETE /api/jobs/{job_id}`) available across **all engines** (ElevenLabs, Local IndicConformer, and Dual Engine).
+   - Purges:
+     - The 16 kHz uncompressed audio file (`audio.wav`) and raw downloads.
+     - All generated transcripts (`transcript.json`, `local_transcript.json`), word timestamps, and silence alignments.
+     - **Local model time counter deduction**: All elapsed audio seconds and processing runtime added by this lecture are immediately removed from cumulative usage counters (`tool_usage.json` and database totals).
+     - All segment audio clips (`segments/*.wav`), NeMo manifests (`manifest.json`), and database records.
+     - **Dictionary & Datasets Cleanup**: Recalculates term frequencies across all remaining lectures. Any candidate transliterations or dictionary entries introduced solely by the deleted lecture (both approved and unapproved) are completely purged from `data/english_map.json`. The lecture is immediately removed from dataset training hours, clip counts, acoustic health telemetry, duration histograms, and lexical diversity metrics.
+   - It is as if the lecture was never submitted to the server. Interactive modal confirmation ensures safe operation.
 
 5. **Local ASR Mathematical Terms & Grammar Sanitizer**:
    - Post-processing pipeline (`sanitize_math_transcription`) cleans IndicConformer transcripts. Spoken English mathematical terms ("x", "y", "plus", "minus", "integral", "matrix") are accurately transcribed into standard academic script without ungrammatical mangled characters.
@@ -173,7 +178,7 @@ the numbers at most once a minute.
 | POST | `/api/jobs/upload` | multipart `file` + optional `keyterms` (comma-separated) → `{"job_id"}` |
 | GET | `/api/jobs` | Past jobs, newest first. `?purpose=training` or `?purpose=transcribe` for one of the two lists |
 | GET | `/api/jobs/{job_id}` | Status, source, engine, purpose, title, duration, error |
-| DELETE | `/api/jobs/{job_id}` | Permanently delete all audio, clips, transcripts, and records; deducts time from local usage counter |
+| DELETE | `/api/jobs/{job_id}` | Permanently purges all audio, clips, transcripts, dictionary proposals/occurrences, and DB records across any engine; deducts local model runtime & updates dataset metrics |
 | GET | `/api/jobs/{job_id}/stream` | Stream audio WAV with HTTP 206 Partial Content support for in-browser playback |
 | GET | `/api/jobs/{job_id}/audio` | Download the full uncompressed `audio.wav` (16 kHz mono), named after lecture title |
 | GET | `/api/jobs/{job_id}/transcript` | Full text + word-level timestamps + segments (start, end, text) |

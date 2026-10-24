@@ -3,6 +3,35 @@
 Newest entries first. MAJOR = new feature or change to how the system is built or
 deployed; MINOR = small fix, wording or documentation change.
 
+## 2026-10-24 — Fix Right-Side Content Cropping & Audio Health Grid Blowout on Mobile [MAJOR]
+
+**What changed:** 
+1. **Identified Root Cause of Right-Side Cropping in Active Tab:**
+   - In CSS Grid, an implicit grid track (or explicit track using `1fr`) defaults to `minmax(auto, 1fr)`.
+   - Grid items (like `.view-pane` inside `.page`) and flex items default to `min-width: auto` (their min-content size).
+   - In the active tab, `.stages` (`flex-wrap: nowrap` containing 7 stages, min-content ~950px), `.health-metrics-grid` (`grid-template-columns: 1fr 1fr`, min-content ~370px), and unconstrained metric cards prevented the grid tracks from shrinking below their intrinsic content widths.
+   - On 360px–390px mobile screens, the card expanded to 420px+, pushing 30px–60px of the right side off-screen. Because `overflow-x: clip` prevented horizontal scrolling, the right side was sliced off — causing column 2 of the audio quality grid (`Speech Loudness (RMS)` and `Speech Activity`) to be cut off right after "Speech Lo" and "Speech Ac".
+2. **Definitive Container Width & Grid Track Constraints:**
+   - On `.page`, explicitly set `grid-template-columns: minmax(0, 1fr); min-width: 0; box-sizing: border-box; overflow-x: clip;`. The `minmax(0, 1fr)` track definition forces the grid column to respect the viewport boundary and never expand beyond 100vw, regardless of child contents.
+   - Applied `width: 100%; max-width: 100%; min-width: 0; box-sizing: border-box; overflow-x: clip;` to `.view-pane`, `.card`, and `.active-workspace-card`.
+   - Constrained `.stages` to `width: 100%; max-width: 100%; min-width: 0; box-sizing: border-box; overflow-x: auto;` so stage scrolling stays strictly contained within the stepper without expanding parent containers.
+3. **Responsive Audio Health Inspector & Comparison Scorecards:**
+   - Updated `.health-metrics-grid` to `grid-template-columns: repeat(2, minmax(0, 1fr)); width: 100%; max-width: 100%; min-width: 0;`.
+   - Set `.health-metric` to `min-width: 0; max-width: 100%; box-sizing: border-box; overflow: hidden;`.
+   - Set `.health-metric .metric-label` to `white-space: normal; overflow-wrap: break-word; word-break: break-word; line-height: 1.25;`. "Speech Loudness (RMS)" and "Speech Activity" now wrap gracefully across lines without any clipping or character loss.
+   - Updated `.compare-scorecards` in mobile media query to `grid-template-columns: repeat(2, minmax(0, 1fr)) !important;` with matching `min-width: 0` constraints, ensuring full readability across all phone sizes.
+
+**Files touched:**
+- `frontend/src/App.css` — added `grid-template-columns: minmax(0, 1fr)` to base `.page`, added `min-width: 0` and `max-width: 100%` to `.card`, `.active-workspace-card`, `.stages`, `.audio-health-card`, and refined `.health-metrics-grid` and `.compare-scorecards` on mobile.
+
+**How to check it:**
+1. Open https://forge.rejected.cc on a mobile browser.
+2. Select any completed lecture with audio health diagnostics.
+3. Observe the Audio Health section: `Speech Loudness (RMS)` and `Speech Activity` are 100% visible, fully contained within the card, and wrapped neatly without any cropped text.
+4. Verify the entire active tab cards have clean left and right 14px gutters from the screen bezels.
+
+---
+
 ## 2026-10-24 — Refined Mobile Polish: Balanced Margins, Left-Crop Fix, Active Layout Redesign & Fixed Bottom Dock Stability [MAJOR]
 
 **What changed:** 

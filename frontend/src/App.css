@@ -204,7 +204,10 @@ body {
   padding-inline: var(--s5);
   padding-block: var(--s8) var(--s12);
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--s6);
+  min-width: 0;
+  box-sizing: border-box;
 }
 
 h1, h2, h3, h4 {
@@ -254,6 +257,9 @@ code, .mono {
   padding: var(--s6);
   box-shadow: var(--shadow-sm);
   transition: border-color 180ms ease, box-shadow 180ms ease;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 .card:hover {
   border-color: var(--border-firm);
@@ -1034,6 +1040,9 @@ input[type="url"]:focus, input[type="text"]:focus {
   background: var(--surface-2);
   border: 1px solid var(--border);
   border-radius: var(--r-md);
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .stages li {
@@ -2143,6 +2152,9 @@ button.alt:hover {
   background: var(--surface-glass);
   box-shadow: var(--shadow-xs);
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .audio-health-card.optimal {
@@ -2173,6 +2185,7 @@ button.alt:hover {
   display: flex;
   align-items: center;
   gap: var(--s3);
+  min-width: 0;
 }
 
 .health-icon-wrap {
@@ -2184,6 +2197,7 @@ button.alt:hover {
   border-radius: var(--r-sm);
   background: var(--accent-soft);
   color: var(--accent);
+  flex-shrink: 0;
 }
 
 .health-title-group h4 {
@@ -2197,6 +2211,7 @@ button.alt:hover {
   display: flex;
   align-items: center;
   gap: var(--s2);
+  flex-wrap: wrap;
 }
 
 .health-metrics-grid {
@@ -2204,6 +2219,8 @@ button.alt:hover {
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: var(--s3);
   margin-top: var(--s4);
+  min-width: 0;
+  max-width: 100%;
 }
 
 .health-metric {
@@ -2213,6 +2230,8 @@ button.alt:hover {
   background: var(--surface-2);
   border-radius: var(--r-sm);
   border: 1px solid var(--border);
+  min-width: 0;
+  box-sizing: border-box;
 }
 
 .health-metric .metric-label {
@@ -3625,17 +3644,26 @@ button.alt:hover {
 
   /* Balanced mobile margins: elegant 14px gutters (not touching bezel, not bloated) */
   .page {
+    grid-template-columns: minmax(0, 1fr) !important;
     padding-inline: 14px !important;
     padding-block: 10px 28px;
     gap: 14px;
+    width: 100%;
     max-width: 100vw;
-    overflow-x: hidden;
+    min-width: 0;
+    overflow-x: clip !important;
+    box-sizing: border-box;
   }
 
   /* Modern rounded glass cards */
   .card {
     padding: 16px 14px;
     border-radius: 14px;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+    overflow-x: clip;
   }
 
   /* Sticky top navigation bar */
@@ -3756,12 +3784,21 @@ button.alt:hover {
 
   .view-pane {
     gap: 12px;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+    overflow-x: clip;
   }
   .active-workspace-card {
     padding: 16px 14px !important;
     border-radius: 14px;
     border-top: 3px solid var(--accent);
-    overflow: visible;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+    overflow-x: clip !important;
   }
 
   /* Workspace Topbar */
@@ -4003,6 +4040,10 @@ button.alt:hover {
     border-radius: 8px;
     list-style: none;
     padding-left: 8px;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
   }
   .stages::-webkit-scrollbar {
     display: none;
@@ -4028,6 +4069,11 @@ button.alt:hover {
     margin-top: 10px;
     padding: 12px 12px;
     border-radius: 10px;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+    overflow-x: clip;
   }
   .health-card-header {
     display: flex;
@@ -4035,41 +4081,109 @@ button.alt:hover {
     justify-content: space-between;
     flex-wrap: wrap;
     gap: 8px;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
   }
   .health-icon-wrap {
     width: 32px;
     height: 32px;
+    flex-shrink: 0;
+  }
+  .health-title-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    max-width: 100%;
+  }
+  .health-title-group > div {
+    min-width: 0;
+    max-width: calc(100% - 40px);
   }
   .health-title-group h4 {
     font-size: 0.9rem;
     line-height: 1.3;
+    overflow-wrap: break-word;
+    word-break: break-word;
   }
   .health-title-group .muted.small {
     font-size: 0.74rem;
+    overflow-wrap: break-word;
+    word-break: break-word;
+    display: block;
+  }
+  .health-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+    max-width: 100%;
   }
   .health-metrics-grid {
-    grid-template-columns: 1fr 1fr;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 8px;
     margin-top: 8px;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
   }
   .health-metric {
-    padding: 8px 10px;
+    padding: 8px 8px;
     border-radius: 8px;
+    min-width: 0;
+    max-width: 100%;
+    box-sizing: border-box;
+    overflow: hidden;
   }
   .health-metric .metric-label {
     font-size: 0.68rem;
+    line-height: 1.25;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-faint);
+    font-weight: 600;
+    white-space: normal;
+    overflow-wrap: break-word;
+    word-break: break-word;
+    display: block;
   }
   .health-metric .metric-value {
-    font-size: 1.05rem;
+    font-size: 1.02rem;
+    font-weight: 700;
+    margin-top: 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
   .health-metric .metric-note {
     font-size: 0.68rem;
-    line-height: 1.3;
+    line-height: 1.25;
+    white-space: normal;
+    overflow-wrap: break-word;
+    word-break: break-word;
+    margin-top: 2px;
   }
   .health-recommendations {
     margin-top: 8px;
     padding: 8px 10px;
     font-size: 0.76rem;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+    overflow-wrap: break-word;
+    word-break: break-word;
+  }
+  .health-recommendations ul {
+    margin: 4px 0 0;
+    padding-left: 18px;
+  }
+  .health-recommendations li {
+    overflow-wrap: break-word;
+    word-break: break-word;
   }
 
   /* Transcripts & Karaoke Reader Experience */
@@ -4218,8 +4332,68 @@ button.alt:hover {
   .desktop-table-view {
     display: none !important;
   }
+  .compare-scorecards {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 8px !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    box-sizing: border-box !important;
+  }
+  .compare-scorecard {
+    min-width: 0;
+    max-width: 100%;
+    box-sizing: border-box;
+    padding: 8px 10px;
+    overflow: hidden;
+  }
+  .compare-scorecard-label {
+    font-size: 0.68rem;
+    line-height: 1.25;
+    white-space: normal;
+    overflow-wrap: break-word;
+    word-break: break-word;
+  }
+  .compare-scorecard-value {
+    font-size: 1.15rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .compare-filter-bar {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+    gap: 8px;
+  }
+  .compare-filter-bar .tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    width: 100%;
+  }
+  .compare-filter-bar .tab {
+    padding: 5px 8px;
+    font-size: 0.74rem;
+  }
+  .compare-card-item {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+    padding: 10px 12px;
+  }
+  .compare-card-text {
+    overflow-wrap: break-word;
+    word-break: break-word;
+  }
   .compare-mobile-cards {
     display: flex !important;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
   }
 
   /* Toast Notifications */
@@ -4280,13 +4454,13 @@ button.alt:hover {
   .page {
     padding-inline: 12px !important;
     gap: 10px;
+    overflow-x: clip !important;
   }
-  .card {
-    padding: 14px 12px;
-    border-radius: 12px;
-  }
+  .card,
   .active-workspace-card {
     padding: 14px 12px !important;
+    border-radius: 12px;
+    overflow-x: clip !important;
   }
   .site-navbar-inner {
     padding: 6px 10px;
@@ -4297,11 +4471,23 @@ button.alt:hover {
     font-size: 0.98rem !important;
     line-height: 1.8 !important;
   }
+  .health-metric {
+    padding: 6px 7px;
+  }
+  .health-metric .metric-value {
+    font-size: 0.96rem;
+  }
 }
 
 @media (max-width: 375px) {
   .page {
     padding-inline: 10px !important;
+    overflow-x: clip !important;
+  }
+  .card,
+  .active-workspace-card {
+    padding: 12px 10px !important;
+    overflow-x: clip !important;
   }
   .site-navbar-inner {
     padding: 5px 8px;
@@ -4318,6 +4504,21 @@ button.alt:hover {
     padding: 5px 4px;
     min-width: 44px;
     font-size: 0.66rem;
+  }
+  .health-metrics-grid {
+    gap: 6px;
+  }
+  .health-metric {
+    padding: 6px 6px;
+  }
+  .health-metric .metric-label {
+    font-size: 0.64rem;
+  }
+  .health-metric .metric-value {
+    font-size: 0.90rem;
+  }
+  .health-metric .metric-note {
+    font-size: 0.62rem;
   }
 }
 

@@ -503,6 +503,246 @@ input[type="url"]:focus, input[type="text"]:focus {
   box-shadow: var(--shadow-xs);
 }
 
+/* ===================================================================
+   Live Classroom Microphone Recording Studio
+   =================================================================== */
+
+.classroom-recorder-card {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 16px;
+  background: var(--surface-2);
+  border: 1px solid var(--border-firm);
+  border-radius: var(--r-md);
+  margin-bottom: var(--s4);
+}
+
+.recorder-header {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.recorder-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.recorder-badge-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.recorder-status-indicator {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--text-faint);
+  transition: all 200ms ease;
+}
+
+.recorder-status-indicator.recording {
+  background: var(--bad);
+  box-shadow: 0 0 10px var(--bad);
+  animation: pulse-dot 1.2s infinite ease-in-out;
+}
+
+.recorder-status-indicator.paused {
+  background: #f59e0b;
+  box-shadow: 0 0 8px #f59e0b;
+}
+
+.recorder-status-indicator.recorded {
+  background: var(--ok);
+  box-shadow: 0 0 8px var(--ok);
+}
+
+.rec-live-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 8px;
+  border-radius: var(--r-full);
+  background: rgba(244, 63, 94, 0.16);
+  color: var(--bad);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+}
+
+.rec-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--bad);
+  animation: pulse-dot 1s infinite;
+}
+
+.rec-paused-pill {
+  padding: 2px 8px;
+  border-radius: var(--r-full);
+  background: rgba(245, 158, 11, 0.16);
+  color: #f59e0b;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.rec-ready-pill {
+  padding: 2px 8px;
+  border-radius: var(--r-full);
+  background: rgba(16, 185, 129, 0.16);
+  color: var(--ok);
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.recorder-active-panel {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 20px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  flex-wrap: wrap;
+}
+
+.recorder-timer-box {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.recorder-timer-digits {
+  font-size: 2.2rem;
+  font-weight: 750;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+  color: var(--text);
+  line-height: 1.1;
+}
+
+.recorder-timer-caption {
+  font-size: 0.74rem;
+  color: var(--text-faint);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.recorder-visualizer-box {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}
+
+.recorder-canvas {
+  height: 48px;
+  width: 220px;
+  background: var(--surface-3);
+  border-radius: var(--r-sm);
+  border: 1px solid var(--border);
+}
+
+.recorder-visualizer-hint {
+  font-size: 0.70rem;
+  color: var(--text-faint);
+}
+
+.recorder-preview-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+}
+
+.recorder-meta-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.82rem;
+  color: var(--text);
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.ok-tag {
+  padding: 2px 8px;
+  background: var(--ok-soft);
+  color: var(--ok);
+  font-size: 0.72rem;
+  font-weight: 650;
+  border-radius: var(--r-full);
+}
+
+.recorder-audio-preview {
+  width: 100%;
+}
+
+.recorder-html5-audio {
+  width: 100%;
+  height: 36px;
+  border-radius: var(--r-sm);
+  outline: none;
+}
+
+.recorder-title-input-label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 0.84rem;
+  font-weight: 600;
+  color: var(--text);
+  margin-top: 4px;
+}
+
+.recorder-title-input-label input {
+  font-size: 0.88rem;
+  padding: 8px 12px;
+}
+
+.recorder-controls-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.recorder-start-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.94rem;
+  font-weight: 650;
+}
+
+.mic-rec-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow: 0 0 6px rgba(255, 255, 255, 0.8);
+}
+
+.recorder-error-alert {
+  padding: 10px 14px;
+  background: var(--bad-soft);
+  color: var(--bad);
+  border: 1px solid rgba(244, 63, 94, 0.3);
+  border-radius: var(--r-sm);
+  font-size: 0.84rem;
+  font-weight: 550;
+}
+
 /* Keyterm suggestion pills */
 .keyterm-chips {
   display: flex;

@@ -28,6 +28,7 @@ import {
 } from "./api.js";
 import { THEMES, applyTheme, loadTheme, saveTheme } from "./theme.js";
 import { WaveformScrubber } from "./WaveformScrubber.jsx";
+import { ClassroomRecorder } from "./ClassroomRecorder.jsx";
 
 const POLL_MS = 3000;
 const FINAL = ["done", "failed"];
@@ -173,6 +174,16 @@ function IconUpload() {
   return (
     <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12" />
+    </svg>
+  );
+}
+
+function IconMic() {
+  return (
+    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
+      <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+      <line x1="12" x2="12" y1="19" y2="22" />
     </svg>
   );
 }
@@ -1080,6 +1091,11 @@ function SubmitForm({ onCreated }) {
         setError("Please paste YouTube links or playlist URLs (one per line).");
         return;
       }
+    } else if (mode === "record") {
+      if (!file) {
+        setError("Please finish recording your classroom audio and click 'Finish & Review' before starting transcription.");
+        return;
+      }
     } else {
       if (!file) {
         setError("Please select an audio or video file to upload.");
@@ -1143,9 +1159,18 @@ function SubmitForm({ onCreated }) {
           role="tab"
           aria-selected={mode === "upload"}
           className={mode === "upload" ? "tab active" : "tab"}
-          onClick={() => { setMode("upload"); setError(""); }}
+          onClick={() => { setMode("upload"); setError(""); setFile(null); }}
         >
           <IconUpload /> File Upload
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={mode === "record"}
+          className={mode === "record" ? "tab active" : "tab"}
+          onClick={() => { setMode("record"); setError(""); setFile(null); }}
+        >
+          <IconMic /> Live Recording
         </button>
       </div>
 
@@ -1175,6 +1200,17 @@ function SubmitForm({ onCreated }) {
             disabled={busy}
           />
         </label>
+      ) : mode === "record" ? (
+        <ClassroomRecorder
+          onRecordingReady={(recordedFile) => {
+            setFile(recordedFile);
+            setError("");
+          }}
+          onDiscard={() => {
+            setFile(null);
+          }}
+          busy={busy}
+        />
       ) : (
         <label>
           Audio or video lecture recording (up to 2 GB)
@@ -1320,10 +1356,14 @@ function SubmitForm({ onCreated }) {
       <div className="actions">
         <button type="submit" className="primary" disabled={busy}>
           {busy ? (
-            mode === "upload" ? "Uploading file…" : "Submitting to queue…"
+            mode === "record" ? "Uploading classroom audio…" : mode === "upload" ? "Uploading file…" : "Submitting to queue…"
           ) : mode === "batch" ? (
             <>
               <IconList /> Queue batch
+            </>
+          ) : mode === "record" ? (
+            <>
+              <IconMic /> Transcribe classroom recording
             </>
           ) : (
             <>

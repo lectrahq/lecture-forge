@@ -3,6 +3,36 @@
 Newest entries first. MAJOR = new feature or change to how the system is built or
 deployed; MINOR = small fix, wording or documentation change.
 
+## 2026-10-24 — Refined Mobile Polish: Balanced Margins, Left-Crop Fix, Active Layout Redesign & Fixed Bottom Dock Stability [MAJOR]
+
+**What changed:** 
+1. **Balanced Mobile Side Margins (Natural Framing):**
+   - Calibrated outer page gutters from extreme 4px/8px to a balanced **14px** on mobile (`12px` on small devices `≤ 480px`, `10px` on `≤ 375px`).
+   - Card padding adjusted to **16px 14px**. The site now has an intentional, elegant breathing border from the phone's physical bezel instead of sticking flush against the glass edges, while maintaining spacious horizontal reading width.
+2. **Fixed Left-Side Content Cropping in Active Tab:**
+   - **Root Cause:** Long unbreaking IDs in `.active-job-topbar` (`Viewing: rec-...`) and table elements exceeded narrow mobile viewport widths, forcing horizontal overflow. In conjunction with `viewport-fit=cover` and tiny 4px/6px padding, the curved screen corners and display bezel on smartphones cropped the left side of cards and headings out of view.
+   - **Fix:** Switched `html, body` overflow to `overflow-x: clip;` (preventing document-level scroll displacement), added `.active-job-id-pill` with `max-width: 170px` and text ellipsis, wrapped `.active-job-topbar` with `flex-wrap: wrap; gap: 8px;`, and ensured headings have `overflow-wrap: break-word;`.
+3. **Active Tab Visual Redesign & Hierarchy:**
+   - **Topbar & Header:** Clean Back to Library button and truncated ID pill.
+   - **Badges & Actions:** Converted badges and Delete Lecture button into `.active-lecture-badges-row` and `.active-lecture-badges-list`, keeping status chips grouped on top and the delete button neatly placed without awkward line wrapping.
+   - **Two-Row Audio Player:** Redesigned player with a full-width timeline scrubber on Row 1, and speed pills (`1×`–`2×`) + centered playback controls (`-10s`, 42px circular Play, `+10s`) on Row 2.
+   - **Engine Timers Telemetry Strips:** Converted timers from squished 2-column boxes into sleek full-width horizontal telemetry rows. The model name and status sit on the left, and runtime duration and speed multiplier sit on the right, eliminating broken multi-line text wrapping.
+   - **Stages & Transcripts:** Smooth horizontal pill progress bar with standard list padding, followed by a comfortable reader view with 1.85 line height and 14px internal padding.
+4. **Bottom Nav Bar Inertial Scroll Jitter Fix:**
+   - **Root Cause:** In WebKit (iOS Safari) and Mobile Chrome, fixed elements with `bottom: 0` without hardware acceleration participate in momentum scrolling on the compositor thread. When inertial scroll occurs, the bottom bar moved upward with the page momentum before snapping back down.
+   - **Fix:** Added `transform: translate3d(0, 0, 0); -webkit-transform: translate3d(0, 0, 0); backface-visibility: hidden; will-change: transform; touch-action: manipulation; contain: layout paint;` to `.mobile-bottom-dock`. This locks the bottom dock strictly into its own GPU hardware compositing layer, keeping it pinned to the bottom of the viewport at all times.
+
+**Files touched:**
+- `frontend/src/App.jsx` — added `.active-job-id-pill`, updated `FullAudioPlayer` to dual-row controls layout, and cleaned badges row structure.
+- `frontend/src/App.css` — switched `html, body` to `overflow-x: clip;`, implemented 14px balanced margins, added telemetry strips for engine timers, redesigned audio player controls, and applied GPU compositing to `.mobile-bottom-dock`.
+
+**How to check it:**
+1. Open https://forge.rejected.cc on a mobile browser.
+2. Note the clean ~14px margin from the screen edge framing the cards.
+3. Open an active lecture: check that all text and buttons on the left edge are fully visible (no cropping), the audio player and timers look organized, and scrolling up and down no longer causes the bottom dock to jump.
+
+---
+
 ## 2026-10-24 — Mobile Browser Layout Overhaul: Full-Width Viewport & Content Density Optimization [MAJOR]
 
 **What changed:** 

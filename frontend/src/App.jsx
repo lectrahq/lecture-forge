@@ -837,7 +837,9 @@ export default function App() {
                   >
                     <IconArrowLeft /> Return to Library
                   </button>
-                  <span className="mono small">Viewing: {currentId}</span>
+                  <span className="mono small active-job-id-pill" title={`Lecture ID: ${currentId}`}>
+                    Viewing: {currentId}
+                  </span>
                 </div>
 
                 {loadError && <p className="error">{loadError}</p>}
@@ -1533,50 +1535,21 @@ function FullAudioPlayer({
       <div className="player-top-row">
         <div className="player-status-badge">
           <span className={`pulse-indicator ${isPlaying ? "active" : ""}`} />
-          <strong>Full Lecture Audio (WAV, 16 kHz Mono)</strong>
+          <span className="player-title-text">
+            <strong>Full Lecture Audio</strong>
+            <span className="player-format-tag"> (WAV, 16 kHz Mono)</span>
+          </span>
           {effectiveDuration > 0 && <span className="muted small">· {formatTime(effectiveDuration)}</span>}
         </div>
         <div className="player-top-actions">
           <a href={audioUrl(job.job_id)} download className="player-download-btn" title="Download uncompressed WAV">
-            <IconDownload /> Download WAV
+            <IconDownload /> <span>Download WAV</span>
           </a>
         </div>
       </div>
 
       <div className="player-main-controls">
-        <button
-          type="button"
-          className="player-skip-btn"
-          onClick={() => skip(-10)}
-          title="Rewind 10 seconds"
-          aria-label="Rewind 10 seconds"
-        >
-          <IconRewind10 />
-          <span>-10s</span>
-        </button>
-
-        <button
-          type="button"
-          className={`player-big-play-btn ${isPlaying ? "playing" : ""}`}
-          onClick={togglePlay}
-          title={isPlaying ? "Pause audio" : "Play full lecture audio"}
-          aria-label={isPlaying ? "Pause audio" : "Play full lecture audio"}
-        >
-          {isPlaying ? <IconPause /> : <IconPlay />}
-        </button>
-
-        <button
-          type="button"
-          className="player-skip-btn"
-          onClick={() => skip(10)}
-          title="Fast-forward 10 seconds"
-          aria-label="Fast-forward 10 seconds"
-        >
-          <span>+10s</span>
-          <IconForward10 />
-        </button>
-
-        {/* Time Scrubber */}
+        {/* Full-width Scrubber */}
         <div className="player-timeline-wrap">
           <span className="player-time-label elapsed">{formatTime(effectiveCurrent)}</span>
           <div className="player-scrubber-track">
@@ -1601,41 +1574,77 @@ function FullAudioPlayer({
           <span className="player-time-label total">{formatTime(effectiveDuration)}</span>
         </div>
 
-        {/* Speed Controls */}
-        <div className="player-speed-pills" role="radiogroup" aria-label="Playback speed">
-          {[1, 1.25, 1.5, 2].map((s) => (
-            <button
-              key={s}
-              type="button"
-              className={`player-speed-btn ${playbackSpeed === s ? "active" : ""}`}
-              onClick={() => changeSpeed(s)}
-            >
-              {s}×
-            </button>
-          ))}
-        </div>
+        {/* Buttons & Speed Row */}
+        <div className="player-controls-row">
+          <div className="player-speed-pills" role="radiogroup" aria-label="Playback speed">
+            {[1, 1.25, 1.5, 2].map((s) => (
+              <button
+                key={s}
+                type="button"
+                className={`player-speed-btn ${playbackSpeed === s ? "active" : ""}`}
+                onClick={() => changeSpeed(s)}
+              >
+                {s}×
+              </button>
+            ))}
+          </div>
 
-        {/* Volume Controls */}
-        <div className="player-volume-wrap">
-          <button
-            type="button"
-            className="player-mute-btn"
-            onClick={toggleMute}
-            title={isMuted ? "Unmute" : "Mute"}
-            aria-label={isMuted ? "Unmute" : "Mute"}
-          >
-            {isMuted || volume === 0 ? <IconVolumeMute /> : <IconVolume />}
-          </button>
-          <input
-            type="range"
-            className="player-volume-slider"
-            min="0"
-            max="1"
-            step="0.05"
-            value={isMuted ? 0 : volume}
-            onChange={handleVolumeChange}
-            aria-label="Volume"
-          />
+          <div className="player-center-btns">
+            <button
+              type="button"
+              className="player-skip-btn"
+              onClick={() => skip(-10)}
+              title="Rewind 10 seconds"
+              aria-label="Rewind 10 seconds"
+            >
+              <IconRewind10 />
+              <span>-10s</span>
+            </button>
+
+            <button
+              type="button"
+              className={`player-big-play-btn ${isPlaying ? "playing" : ""}`}
+              onClick={togglePlay}
+              title={isPlaying ? "Pause audio" : "Play full lecture audio"}
+              aria-label={isPlaying ? "Pause audio" : "Play full lecture audio"}
+            >
+              {isPlaying ? <IconPause /> : <IconPlay />}
+            </button>
+
+            <button
+              type="button"
+              className="player-skip-btn"
+              onClick={() => skip(10)}
+              title="Fast-forward 10 seconds"
+              aria-label="Fast-forward 10 seconds"
+            >
+              <span>+10s</span>
+              <IconForward10 />
+            </button>
+          </div>
+
+          {/* Volume Controls */}
+          <div className="player-volume-wrap">
+            <button
+              type="button"
+              className="player-mute-btn"
+              onClick={toggleMute}
+              title={isMuted ? "Unmute" : "Mute"}
+              aria-label={isMuted ? "Unmute" : "Mute"}
+            >
+              {isMuted || volume === 0 ? <IconVolumeMute /> : <IconVolume />}
+            </button>
+            <input
+              type="range"
+              className="player-volume-slider"
+              min="0"
+              max="1"
+              step="0.05"
+              value={isMuted ? 0 : volume}
+              onChange={handleVolumeChange}
+              aria-label="Volume"
+            />
+          </div>
         </div>
       </div>
     </div>
@@ -1682,8 +1691,8 @@ function JobStatus({
         {` · ID: ${job.job_id}`}
       </p>
 
-      <div className="badges" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }}>
+      <div className="active-lecture-badges-row">
+        <div className="active-lecture-badges-list">
           <span className="badge engine">
             {job.engine === "elevenlabs" && <IconMic />}
             {job.engine === "local" && <IconCpu />}

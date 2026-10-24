@@ -3486,6 +3486,127 @@ function SpellingRow({ entry, draft, busy, error, onDraft, onSave }) {
   );
 }
 
+// --- Dataset Health & Diversity Metrics Component ---
+function DatasetHealthAndDiversity({ summary }) {
+  const { acoustic_health, duration_histogram, vocabulary_metrics } = summary || {};
+  if (!acoustic_health || !duration_histogram || !vocabulary_metrics) return null;
+
+  const buckets = duration_histogram.buckets || {};
+  const totalClips = duration_histogram.total_measured_clips || 1;
+
+  return (
+    <div className="dataset-health-section">
+      <div className="dataset-health-header">
+        <div>
+          <h3>Dataset Acoustic Health & Diversity Metrics</h3>
+          <p className="muted small" style={{ margin: "4px 0 0" }}>
+            Telemetry and corpus analytics aggregated across all training lectures to guarantee NeMo ASR model convergence.
+          </p>
+        </div>
+        <span className="badge done quality-tier-badge">
+          {acoustic_health.quality_tier}
+        </span>
+      </div>
+
+      <div className="dataset-health-grid">
+        {/* Acoustic Health Card */}
+        <div className="dh-card">
+          <div className="dh-card-title">Acoustic Signal Quality</div>
+          <div className="dh-metrics-list">
+            <div className="dh-metric-row">
+              <span className="dh-metric-label">Mean Signal-to-Noise (SNR)</span>
+              <strong className="dh-metric-val" style={{ color: "var(--ok)" }}>
+                {acoustic_health.mean_snr_db} dB
+              </strong>
+            </div>
+            <div className="dh-metric-row">
+              <span className="dh-metric-label">Mean Speech Loudness</span>
+              <strong className="dh-metric-val">{acoustic_health.mean_speech_rms_db} dBFS</strong>
+            </div>
+            <div className="dh-metric-row">
+              <span className="dh-metric-label">Speech Activity Ratio</span>
+              <strong className="dh-metric-val">{acoustic_health.mean_speech_percent}%</strong>
+            </div>
+            <div className="dh-metric-row">
+              <span className="dh-metric-label">Digital Ceiling Clipping</span>
+              <strong className="dh-metric-val" style={{ color: acoustic_health.total_clipped_samples === 0 ? "var(--ok)" : "var(--warn)" }}>
+                {acoustic_health.total_clipped_samples} samples
+              </strong>
+            </div>
+          </div>
+        </div>
+
+        {/* Clip Length Distribution Card */}
+        <div className="dh-card">
+          <div className="dh-card-title">
+            <span>Clip Duration Distribution</span>
+            <span className="dh-badge-sub">{duration_histogram.optimal_percent}% optimal (5–20s)</span>
+          </div>
+
+          <div className="dh-histogram-bars">
+            {Object.entries(buckets).map(([bucket, count]) => {
+              const pct = ((count / totalClips) * 100).toFixed(1);
+              const isOptimal = bucket !== "< 5s" && bucket !== "> 20s";
+              return (
+                <div key={bucket} className="dh-hist-col">
+                  <div className="dh-hist-bar-track">
+                    <div
+                      className={`dh-hist-bar-fill ${isOptimal ? "optimal" : "marginal"}`}
+                      style={{ height: `${Math.max(4, Math.min(100, (count / totalClips) * 160))}%` }}
+                      title={`${bucket}: ${count} clips (${pct}%)`}
+                    />
+                  </div>
+                  <span className="dh-hist-label">{bucket}</span>
+                  <span className="dh-hist-count">{count}</span>
+                </div>
+              );
+            })}
+          </div>
+          <div className="dh-hist-footer">
+            Avg clip length: <strong>{duration_histogram.avg_clip_duration}s</strong> across {totalClips} training clips
+          </div>
+        </div>
+
+        {/* Lexical Diversity Card */}
+        <div className="dh-card">
+          <div className="dh-card-title">Lexical & Domain Diversity</div>
+          <div className="dh-metrics-list">
+            <div className="dh-metric-row">
+              <span className="dh-metric-label">Total Spoken Tokens</span>
+              <strong className="dh-metric-val">{vocabulary_metrics.total_tokens.toLocaleString()}</strong>
+            </div>
+            <div className="dh-metric-row">
+              <span className="dh-metric-label">Unique Vocabulary (Types)</span>
+              <strong className="dh-metric-val">{vocabulary_metrics.unique_words.toLocaleString()}</strong>
+            </div>
+            <div className="dh-metric-row">
+              <span className="dh-metric-label">Type-Token Ratio (TTR)</span>
+              <strong className="dh-metric-val">{vocabulary_metrics.type_token_ratio}</strong>
+            </div>
+            <div className="dh-metric-row">
+              <span className="dh-metric-label">Technical Loanword Tokens</span>
+              <strong className="dh-metric-val highlight-loan">{vocabulary_metrics.loanword_tokens.toLocaleString()}</strong>
+            </div>
+          </div>
+
+          {vocabulary_metrics.top_keywords && vocabulary_metrics.top_keywords.length > 0 && (
+            <div className="dh-top-keywords">
+              <span className="dh-keywords-label">Frequent Domain Terms:</span>
+              <div className="dh-keywords-wrap">
+                {vocabulary_metrics.top_keywords.map((kw, i) => (
+                  <span key={i} className="dh-kw-chip">
+                    {kw.word} <small>×{kw.count}</small>
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // --- Training Dataset Management Hub (Part 2 Bridge) ---
 function DatasetHub({ onDatasetCreated }) {
   const [summary, setSummary] = useState(null);
@@ -3618,6 +3739,9 @@ function DatasetHub({ onDatasetCreated }) {
       <p className="muted small">
         Dataset Target: <strong>{summary.total_hours} h</strong> collected of {summary.target_hours} h target dataset size for GPU fine-tuning.
       </p>
+
+      {/* Dataset Acoustic Health & Diversity Metrics */}
+      <DatasetHealthAndDiversity summary={summary} />
 
       {/* Export Controls */}
       <div className="dataset-export-box">

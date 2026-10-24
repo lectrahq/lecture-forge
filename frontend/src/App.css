@@ -5586,3 +5586,187 @@ button.alt:hover {
   max-width: 600px;
   line-height: 1.5;
 }
+
+/* ==========================================================================
+   Dataset Acoustic Health & Diversity Metrics Hub
+   ========================================================================== */
+
+.dataset-health-section {
+  margin: 20px 0;
+  padding: 18px 20px;
+  background: rgba(15, 20, 30, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+}
+
+.dataset-health-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.dataset-health-header h3 {
+  margin: 0;
+  font-size: 1.15rem;
+  color: var(--text-primary, #f1f5f9);
+}
+
+.quality-tier-badge {
+  font-size: 0.78rem;
+  padding: 4px 10px;
+}
+
+.dataset-health-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px;
+}
+
+.dh-card {
+  background: rgba(22, 27, 34, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 10px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+}
+
+.dh-card-title {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: #d8b4fe;
+  margin-bottom: 12px;
+}
+
+.dh-badge-sub {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #34d399;
+  background: rgba(16, 185, 129, 0.15);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.dh-metrics-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.dh-metric-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.82rem;
+}
+
+.dh-metric-label {
+  color: var(--text-muted, #94a3b8);
+}
+
+.dh-metric-val {
+  color: var(--text-primary, #f1f5f9);
+  font-weight: 600;
+}
+
+/* Histogram */
+.dh-histogram-bars {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  height: 90px;
+  gap: 8px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  margin-bottom: 8px;
+}
+
+.dh-hist-col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  height: 100%;
+}
+
+.dh-hist-bar-track {
+  flex: 1;
+  width: 100%;
+  max-width: 28px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 4px;
+}
+
+.dh-hist-bar-fill {
+  width: 100%;
+  border-radius: 4px;
+  transition: height 0.3s ease;
+}
+
+.dh-hist-bar-fill.optimal {
+  background: linear-gradient(180deg, #a855f7, #6366f1);
+}
+
+.dh-hist-bar-fill.marginal {
+  background: rgba(245, 158, 11, 0.6);
+}
+
+.dh-hist-label {
+  font-size: 0.68rem;
+  color: var(--text-muted, #94a3b8);
+}
+
+.dh-hist-count {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--text-primary, #f1f5f9);
+}
+
+.dh-hist-footer {
+  font-size: 0.76rem;
+  color: var(--text-muted, #94a3b8);
+  margin-top: 4px;
+}
+
+.dh-top-keywords {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.dh-keywords-label {
+  font-size: 0.72rem;
+  color: var(--text-muted, #94a3b8);
+  display: block;
+  margin-bottom: 6px;
+}
+
+.dh-keywords-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.dh-kw-chip {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  padding: 1px 6px;
+  font-size: 0.74rem;
+  color: #cbd5e1;
+}
+
+.dh-kw-chip small {
+  color: #94a3b8;
+}
+

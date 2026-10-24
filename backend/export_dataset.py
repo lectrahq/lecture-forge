@@ -98,6 +98,82 @@ def get_dataset_summary() -> dict:
     mapping = load_english_map(MAP_PATH) if os.path.isfile(MAP_PATH) else {}
     datasets = list_datasets()
 
+    # 1. Acoustic Health Aggregation
+    snr_list, rms_list, speech_pct_list, health_scores = [], [], [], []
+    total_clipped = 0
+
+    # 2. Clip duration histogram
+    clip_buckets = {"< 5s": 0, "5–10s": 0, "10–15s": 0, "15–20s": 0, "> 20s": 0}
+    all_durations = []
+    all_tokens = []
+    loanword_set = set(k.lower() for k in mapping.keys()) | set(v.lower() for v in mapping.values())
+    loanword_hits = 0
+
+    for j in finished:
+        folder = os.path.join(db.DATA_DIR, j["id"])
+        h_file = os.path.join(folder, "audio_health.json")
+        if os.path.isfile(h_file):
+            try:
+                with open(h_file, encoding="utf-8") as f:
+                    h = json.load(f)
+                    if h.get("snr_db") is not None:
+                        snr_list.append(h["snr_db"])
+                    if h.get("speech_rms_db") is not None:
+                        rms_list.append(h["speech_rms_db"])
+                    if h.get("speech_percent") is not None:
+                        speech_pct_list.append(h["speech_percent"])
+                    if h.get("score") is not None:
+                        health_scores.append(h["score"])
+                    total_clipped += h.get("clipped_samples", 0)
+            except Exception:
+                pass
+
+        s_file = os.path.join(folder, "segments.json")
+        if os.path.isfile(s_file):
+            try:
+                with open(s_file, encoding="utf-8") as f:
+                    segs = json.load(f)
+                    for s in segs:
+                        dur = s.get("end", 0) - s.get("start", 0)
+                        all_durations.append(dur)
+                        if dur < 5:
+                            clip_buckets["< 5s"] += 1
+                        elif dur < 10:
+                            clip_buckets["5–10s"] += 1
+                        elif dur < 15:
+                            clip_buckets["10–15s"] += 1
+                        elif dur < 20:
+                            clip_buckets["15–20s"] += 1
+                        else:
+                            clip_buckets["> 20s"] += 1
+
+                        text = s.get("text", "")
+                        for w in text.split():
+                            clean_w = w.strip(".,;:?!()[]\"'")
+                            if clean_w:
+                                all_tokens.append(clean_w)
+                                if clean_w.lower() in loanword_set or has_latin(clean_w):
+                                    loanword_hits += 1
+            except Exception:
+                pass
+
+    total_actual_clips = len(all_durations)
+    avg_dur = round(sum(all_durations) / max(1, total_actual_clips), 2)
+    avg_snr = round(sum(snr_list) / max(1, len(snr_list)), 1) if snr_list else 0.0
+    avg_rms = round(sum(rms_list) / max(1, len(rms_list)), 1) if rms_list else 0.0
+    avg_speech_pct = round(sum(speech_pct_list) / max(1, len(speech_pct_list)), 1) if speech_pct_list else 0.0
+    avg_score = round(sum(health_scores) / max(1, len(health_scores)), 1) if health_scores else 100.0
+
+    optimal_clips = clip_buckets["5–10s"] + clip_buckets["10–15s"] + clip_buckets["15–20s"]
+    optimal_pct = round((optimal_clips / max(1, total_actual_clips)) * 100, 1)
+
+    vocab_counts = Counter(all_tokens)
+    vocab_size = len(vocab_counts)
+    ttr = round(vocab_size / max(1, len(all_tokens)), 3)
+    top_vocab = [{"word": w, "count": c} for w, c in vocab_counts.most_common(12) if len(w) > 3]
+
+    quality_tier = "Studio Quality (SNR >25 dB)" if avg_snr >= 25 else "Clean Classroom (SNR >18 dB)" if avg_snr >= 18 else "Moderate Acoustics"
+
     return {
         "training_jobs_count": len(finished),
         "total_seconds": round(total_seconds, 1),
@@ -107,6 +183,27 @@ def get_dataset_summary() -> dict:
         "target_percent": percent,
         "ready_to_export": len(finished) >= 3,
         "english_map_words": len(mapping),
+        "acoustic_health": {
+            "mean_snr_db": avg_snr,
+            "mean_speech_rms_db": avg_rms,
+            "mean_speech_percent": avg_speech_pct,
+            "mean_health_score": avg_score,
+            "total_clipped_samples": total_clipped,
+            "quality_tier": quality_tier,
+        },
+        "duration_histogram": {
+            "buckets": clip_buckets,
+            "avg_clip_duration": avg_dur,
+            "optimal_percent": optimal_pct,
+            "total_measured_clips": total_actual_clips,
+        },
+        "vocabulary_metrics": {
+            "total_tokens": len(all_tokens),
+            "unique_words": vocab_size,
+            "type_token_ratio": ttr,
+            "loanword_tokens": loanword_hits,
+            "top_keywords": top_vocab[:8],
+        },
         "training_jobs": [
             {
                 "id": j["id"],

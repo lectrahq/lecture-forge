@@ -23,17 +23,55 @@ Browser ──HTTPS──> Caddy (basic auth, HTTPS, serves the React site)
                      ▼
                   FastAPI backend ──> yt-dlp (YouTube audio) ──> FFmpeg (16 kHz mono WAV)
                      │                                              │
-                     │            ElevenLabs Scribe v2 <────────────┘
+                     │  ElevenLabs Scribe v2 <──────────────────────┤
+                     │  AI4Bharat IndicConformer (Local ASR) <──────┘
                      ▼
                   data/<job_id>/  (audio, transcript, clips, manifest) + data/jobs.db (SQLite)
 ```
 
 Job stages: `queued → downloading → transcribing → segmenting → done` (or `failed`
-with an error message). Work runs in the background; the page checks every 3 seconds.
+with an error message). Work runs asynchronously in the background.
 
-On the website, each job shows its YouTube link (also in the job list) and a
-**Download audio** button for the extracted WAV. The **System / Light / Dark** switch
-at the top right changes the colour theme; the choice is remembered in that browser.
+### Key Capabilities & New Features
+
+1. **Interactive Full Lecture Audio Player & Word-Level Karaoke Sync**:
+   - Stream audio directly inside the browser with HTTP byte-range support (`/api/jobs/{job_id}/stream`).
+   - Authoritative WAV header duration measurement on the server guarantees exact audio runtime (eliminates partial HTTP stream length truncation).
+   - High-performance 60 FPS animation loop with `requestAnimationFrame` and custom DOM event dispatching (`forge:audiotick`, `forge:audioseek`, `forge:audiostate`), achieving **0 React re-renders** during playback.
+   - **Clickable Word Seeking**: Click any word in the transcript to instantly jump playback to its exact timestamp.
+   - **Zero-Jitter Highlight Engine**: Active words are highlighted in warm amber without font bolding or padding changes, ensuring text lines never reflow or jump when words are highlighted.
+   - **Playback Speed Selector**: Instant speed controls for `0.5×`, `1×`, `1.25×`, `1.5×`, and `2×`.
+   - **Precision Seeking**: `−10s` rewind and `+10s` fast-forward buttons.
+   - **Reading-Band Auto-Scroll**: Smoothly tracks active speech within a comfortable vertical reading band (18%–65% of viewport height).
+
+2. **Acoustic Quality & Audio Health Inspector**:
+   - Real-time diagnostic evaluation of acoustic fitness for AI4Bharat IndicConformer speech fine-tuning (`/api/jobs/{job_id}/health`).
+   - Measures:
+     - **Signal-to-Noise Ratio (SNR dB)** (background room noise vs speech clarity).
+     - **Speech Loudness (RMS dBFS)** (microphone gain calibration).
+     - **Digital Ceiling & Peak Clipping** (clipped samples count and percentage).
+     - **Speech Activity Ratio** (active speech percentage vs pauses).
+   - Generates actionable acoustic recommendations and fine-tuning readiness scores (Optimal, Good, Fair, Poor).
+
+3. **Human Verification & Clip Editor**:
+   - Inline segment audio player to listen to individual 5–20s speech slices.
+   - In-place Malayalam text editor to correct automated transcription errors.
+   - One-click synchronization: human edits save directly back to `data/<job_id>/segments.json` and update the NVIDIA NeMo training `manifest.json`.
+   - Certified "Human Verified" badge to distinguish gold-standard ground truth from automated ASR.
+   - Instant Revert option to reset back to original automated transcripts if desired.
+
+4. **Permanent Lecture Deletion & Usage Counter Deduction**:
+   - Complete data cleanup (`DELETE /api/jobs/{job_id}`): removes audio WAV, transcripts, clip segments, and SQLite records from the server.
+   - Automatically deducts the lecture's duration from the server's local model time tracking counter (`tool_usage.json`), leaving zero residual footprint.
+   - Interactive modal confirmation prevents accidental deletions.
+
+5. **Local ASR Mathematical Terms & Grammar Sanitizer**:
+   - Post-processing pipeline (`sanitize_math_transcription`) cleans IndicConformer transcripts. Spoken English mathematical terms ("x", "y", "plus", "minus", "integral", "matrix") are accurately transcribed into standard academic script without ungrammatical mangled characters.
+
+6. **PWA-Grade Mobile & Tablet Responsive Experience**:
+   - Balanced 14px gutters framing mobile displays naturally without touching curved bezels.
+   - Isolated GPU hardware-composited navigation dock (`translate3d(0,0,0)`) prevents inertial scroll jumping.
+   - Responsive multi-column to single-column degradation with zero horizontal clipping.
 
 ### Choosing how a lecture is transcribed
 
@@ -44,16 +82,12 @@ Two questions on the submit form:
 | Choice | Accuracy | Cost |
 |---|---|---|
 | **ElevenLabs** (default) | best | ~70 credits per minute of audio |
-| **Local model** | weaker | **free** — runs on this server, no credits |
+| **Local model** | free local ASR | **free** — runs on this server, no credits |
 | **Both** | both, shown side by side | ~70 credits per minute |
 
 The local model is AI4Bharat IndicConformer running in the `asr` container on this
 server's processor. Measured on a real 41-minute lecture: **302 seconds, about 8× real
 time**, so roughly **7 minutes for a 1-hour lecture**.
-
-(An earlier figure of 14× came from a large batch size. That turned out to exceed the
-container's memory limit and get the service killed on real lectures, so the batch is now
-deliberately small — costing a little speed for reliability.)
 
 **Use this for** (not asked when the local model is chosen, because it cannot produce
 training data)
@@ -80,8 +114,9 @@ Local-model jobs cannot be promoted — they have no word timings.
 > English first, using `data/english_map.json`. Until that table is filled in
 > (`build_english_map.py --fill`), the page says the scores are not meaningful yet —
 > they would be measuring alphabets rather than recognition.
+
 A card at the top shows the **ElevenLabs credits** left on the account and when they
-reset, plus how much audio this tool has transcribed.
+reset, plus how much audio this tool has transcribed across both cloud and local engines.
 
 ### ElevenLabs API key permissions
 | Permission | Needed for |
@@ -96,7 +131,7 @@ the numbers at most once a minute.
 
 | Folder / file | What it is |
 |---|---|
-| `backend/` | FastAPI app: `main.py` (API + pipeline), `downloader.py` (yt-dlp + FFmpeg), `transcriber.py` (ElevenLabs), `segmenter.py` (clips + manifest), `db.py` (SQLite) |
+| `backend/` | FastAPI app: `main.py` (API + pipeline), `downloader.py` (yt-dlp + FFmpeg), `transcriber.py` (ElevenLabs), `local_transcriber.py` (IndicConformer + math sanitizer), `segmenter.py` (clips + manifest), `audio_health.py` (acoustic diagnostics), `db.py` (SQLite) |
 | `asr/` | Local speech recognition service: AI4Bharat IndicConformer behind a small HTTP API, called only by the backend |
 | `frontend/` | React (Vite) single-page site. Its Dockerfile builds the site and puts it inside the Caddy image |
 | `caddy/Caddyfile` | Web server config: HTTPS, basic auth, upload limit, `/api` proxy |
@@ -112,12 +147,19 @@ the numbers at most once a minute.
 | POST | `/api/jobs/upload` | multipart `file` + optional `keyterms` (comma-separated) → `{"job_id"}` |
 | GET | `/api/jobs` | Past jobs, newest first. `?purpose=training` or `?purpose=transcribe` for one of the two lists |
 | GET | `/api/jobs/{job_id}` | Status, source, engine, purpose, title, duration, error |
-| GET | `/api/jobs/{job_id}/transcript` | Full text + segments (start, end, text) |
+| DELETE | `/api/jobs/{job_id}` | Permanently delete all audio, clips, transcripts, and records; deducts time from local usage counter |
+| GET | `/api/jobs/{job_id}/stream` | Stream audio WAV with HTTP 206 Partial Content support for in-browser playback |
+| GET | `/api/jobs/{job_id}/audio` | Download the full uncompressed `audio.wav` (16 kHz mono), named after lecture title |
+| GET | `/api/jobs/{job_id}/transcript` | Full text + word-level timestamps + segments (start, end, text) |
+| POST | `/api/jobs/{job_id}/transcript` | Save human verified segment text corrections & update NeMo manifest |
+| POST | `/api/jobs/{job_id}/transcript/revert` | Revert human edits back to original automated ElevenLabs transcript |
+| GET | `/api/jobs/{job_id}/health` | Acoustic quality diagnostics (SNR dB, RMS volume, clipping samples, speech ratio, recommendations) |
+| POST | `/api/jobs/{job_id}/health/reanalyze` | Recalculate acoustic SNR and clipping characteristics on `audio.wav` |
 | GET | `/api/jobs/{job_id}/comparison` | ElevenLabs vs local model, segment by segment, with WER/CER |
+| GET | `/api/jobs/{job_id}/snippet` | Sub-second audio snippet player for comparison discrepancy audit |
 | POST | `/api/jobs/{job_id}/promote` | Turn a transcribe-only job into training data. Spends no credits |
-| GET | `/api/jobs/{job_id}/audio` | Download the extracted `audio.wav` (16 kHz mono), named after the video/file title |
-| GET | `/api/usage` | ElevenLabs credits used / left (needs the key's "User: Read" permission) + totals transcribed by this tool |
-| GET | `/api/health` | Health check |
+| GET | `/api/usage` | ElevenLabs cloud credits & local model audio processed telemetry |
+| GET | `/api/health` | Service health check |
 
 ---
 

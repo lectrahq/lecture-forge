@@ -1577,7 +1577,7 @@ function FullAudioPlayer({
         {/* Buttons & Speed Row */}
         <div className="player-controls-row">
           <div className="player-speed-pills" role="radiogroup" aria-label="Playback speed">
-            {[1, 1.25, 1.5, 2].map((s) => (
+            {[0.5, 1, 1.25, 1.5, 2].map((s) => (
               <button
                 key={s}
                 type="button"
@@ -2257,7 +2257,7 @@ function SegmentEditorAndPlayer({ job, transcript, onUpdated }) {
         <div className="verifier-toolbar">
           <div className="verifier-player-controls">
             <span className="toolbar-label">Speed:</span>
-            {[0.75, 1, 1.25, 1.5].map((spd) => (
+            {[0.5, 0.75, 1, 1.25, 1.5].map((spd) => (
               <button
                 key={spd}
                 type="button"

@@ -1279,14 +1279,18 @@ input[type="url"]:focus, input[type="text"]:focus {
 
 /* --- Interactive Word Karaoke Highlighting --- */
 .k-word {
-  display: inline-block;
+  display: inline;
   cursor: pointer;
-  border-radius: 4px;
-  padding: 1px 4px;
-  margin: 0 1px;
+  border-radius: 3px;
+  padding: 1px 2px;
+  margin: 0;
   color: var(--text);
-  transition: background 0.06s ease, color 0.06s ease;
+  font-weight: inherit !important;
+  letter-spacing: inherit !important;
+  transition: background 0.05s ease, color 0.05s ease;
   user-select: text;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
 }
 
 .k-word:hover {
@@ -1303,10 +1307,11 @@ input[type="url"]:focus, input[type="text"]:focus {
 
 .k-word.active {
   background: #f59e0b;
-  color: #0f172a !important;
-  font-weight: 700;
-  border-radius: 4px;
-  box-shadow: 0 0 10px rgba(245, 158, 11, 0.55);
+  color: #090d16 !important;
+  font-weight: inherit !important;
+  letter-spacing: inherit !important;
+  border-radius: 3px;
+  box-shadow: 0 0 0 1px rgba(245, 158, 11, 0.4), 0 2px 6px rgba(245, 158, 11, 0.35);
   position: relative;
   z-index: 2;
   text-decoration: none;
@@ -3107,15 +3112,15 @@ button.alt:hover {
 
 /* --- Full In-Browser Lecture Audio Player --- */
 .full-audio-player {
-  margin: var(--s3) 0 var(--s4);
-  padding: 14px 18px;
+  margin: 8px 0 10px;
+  padding: 10px 14px;
   background: var(--surface-2);
   border: 1px solid var(--border-firm);
   border-radius: var(--r-md);
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 8px;
   transition: all 200ms ease;
 }
 
@@ -3190,7 +3195,7 @@ button.alt:hover {
 .player-main-controls {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 6px;
 }
 
 .player-controls-row {
@@ -3198,7 +3203,7 @@ button.alt:hover {
   align-items: center;
   justify-content: space-between;
   flex-wrap: wrap;
-  gap: 12px;
+  gap: 8px;
 }
 
 .player-center-btns {
@@ -3876,21 +3881,22 @@ button.alt:hover {
     border-radius: 6px;
   }
 
-  /* Audio Player: Polished & Well-Proportioned */
+  /* Audio Player: Compact, Well-Proportioned & No Wasted Space */
   .full-audio-player {
-    padding: 14px 14px;
-    gap: 12px;
-    margin: 12px 0 14px;
-    border-radius: 12px;
+    padding: 10px 10px;
+    gap: 8px;
+    margin: 8px 0 10px;
+    border-radius: 10px;
   }
   .player-top-row {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 8px;
+    gap: 6px;
+    margin-bottom: 2px;
   }
   .player-status-badge {
-    font-size: 0.78rem;
+    font-size: 0.76rem;
     gap: 6px;
     min-width: 0;
   }
@@ -3898,69 +3904,76 @@ button.alt:hover {
     display: none; /* Hide heavy parenthetical on mobile */
   }
   .player-top-actions {
-    gap: 6px;
+    gap: 4px;
     flex-shrink: 0;
   }
   .player-download-btn {
-    font-size: 0.72rem;
-    padding: 4px 10px;
-    min-height: 30px;
+    font-size: 0.70rem;
+    padding: 2px 8px;
+    min-height: 26px;
+    border-radius: var(--r-full);
   }
   .player-main-controls {
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: 5px; /* Tight, proportional spacing between scrubber and controls */
   }
   .player-timeline-wrap {
     width: 100%;
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 6px;
   }
   .player-time-label {
-    font-size: 0.74rem;
-    min-width: 38px;
+    font-size: 0.70rem;
+    min-width: 34px;
   }
   .player-scrubber {
-    height: 8px;
+    height: 6px;
   }
   .player-scrubber::-webkit-slider-thumb {
-    width: 18px;
-    height: 18px;
+    width: 15px;
+    height: 15px;
   }
   .player-controls-row {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 8px;
+    gap: 6px;
     width: 100%;
+    margin-top: 2px;
   }
   .player-speed-pills {
-    padding: 2px;
+    padding: 1px;
+    gap: 1px;
+    border-radius: 6px;
   }
   .player-speed-btn {
-    padding: 3px 6px;
-    font-size: 0.7rem;
-    min-height: 28px;
+    padding: 2px 5px;
+    font-size: 0.66rem;
+    min-height: 24px;
+    border-radius: 4px;
+    font-weight: 600;
   }
   .player-center-btns {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 6px;
   }
   .player-big-play-btn {
-    width: 42px;
-    height: 42px;
+    width: 36px;
+    height: 36px;
   }
   .player-big-play-btn svg {
-    width: 18px;
-    height: 18px;
+    width: 16px;
+    height: 16px;
   }
   .player-skip-btn {
-    height: 32px;
-    padding: 0 8px;
-    font-size: 0.74rem;
-    min-height: 32px;
+    height: 28px;
+    padding: 0 6px;
+    font-size: 0.70rem;
+    min-height: 28px;
+    border-radius: 6px;
   }
   .player-volume-wrap {
     display: none !important; /* Phones use hardware rocker buttons */
@@ -4231,8 +4244,9 @@ button.alt:hover {
     letter-spacing: 0.01em;
   }
   .k-word {
-    padding: 1px 3px;
+    padding: 1px 2px;
     margin: 0;
+    font-weight: inherit !important;
   }
   .second-transcript {
     margin-top: 14px;
@@ -4519,6 +4533,24 @@ button.alt:hover {
   }
   .health-metric .metric-note {
     font-size: 0.62rem;
+  }
+  .player-speed-btn {
+    padding: 2px 4px;
+    font-size: 0.62rem;
+    min-height: 22px;
+  }
+  .player-center-btns {
+    gap: 4px;
+  }
+  .player-skip-btn {
+    height: 26px;
+    padding: 0 4px;
+    font-size: 0.66rem;
+    min-height: 26px;
+  }
+  .player-big-play-btn {
+    width: 34px;
+    height: 34px;
   }
 }
 

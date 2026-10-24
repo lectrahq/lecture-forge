@@ -41,6 +41,7 @@ with an error message). Work runs asynchronously in the background.
    - **Clickable Word Seeking**: Click any word in the transcript to instantly jump playback to its exact timestamp.
    - **Zero-Jitter Highlight Engine**: Active words are highlighted in warm amber without font bolding or padding changes, ensuring text lines never reflow or jump when words are highlighted.
    - **Playback Speed Selector**: Instant speed controls for `0.5×`, `1×`, `1.25×`, `1.5×`, and `2×`.
+   - **Interactive Waveform Audio Display**: 300-point normalized amplitude soundwave envelope with sub-millisecond server caching (`/api/jobs/{job_id}/waveform`). Renders a Retina-sharp Canvas track with live gradient progress, glowing cursor, dynamic hover timestamp tooltip, and click/touch scrubbing.
    - **Precision Seeking**: `−10s` rewind and `+10s` fast-forward buttons.
    - **Reading-Band Auto-Scroll**: Smoothly tracks active speech within a comfortable vertical reading band (18%–65% of viewport height).
 

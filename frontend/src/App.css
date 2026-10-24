@@ -5376,6 +5376,18 @@ button.alt:hover {
   border-bottom: 2px solid rgba(168, 85, 247, 0.6);
 }
 
+.tok-compound {
+  border-bottom: 2px dashed rgba(56, 189, 248, 0.6);
+}
+
+.tok-compound-hint {
+  font-size: 0.82em;
+  opacity: 0.78;
+  color: #7dd3fc;
+  margin-left: 3px;
+  font-weight: 500;
+}
+
 .tok-sub {
   background: rgba(245, 158, 11, 0.14);
   border: 1px solid rgba(245, 158, 11, 0.3);

@@ -413,13 +413,21 @@ export default function WerHeatmap({
                     {s.alignment && s.alignment.length > 0 ? (
                       s.alignment.map((tok, tIdx) => {
                         if (tok.type === "match") {
+                          const tooltip = tok.is_compound
+                            ? `Compound match: "${tok.ref}" ↔ "${tok.hyp}"`
+                            : (tok.ref !== tok.hyp
+                                ? `Phonetic loanword match: "${tok.ref}" ↔ "${tok.hyp}"`
+                                : "Exact match");
                           return (
                             <span
                               key={tIdx}
-                              className={`diff-tok tok-match ${tok.is_loanword ? "tok-loan" : ""}`}
-                              title={tok.is_loanword ? "Technical loanword match" : "Exact match"}
+                              className={`diff-tok tok-match ${tok.is_loanword ? "tok-loan" : ""} ${tok.is_compound ? "tok-compound" : ""}`}
+                              title={tooltip}
                             >
                               {tok.ref}
+                              {tok.is_compound && (
+                                <span className="tok-compound-hint"> ({tok.hyp})</span>
+                              )}
                             </span>
                           );
                         }

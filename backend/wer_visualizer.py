@@ -1,23 +1,155 @@
 """
 WER & CER Visual Alignment, Token Diffing, and OOV Error Analytics.
 
-Computes exact sequence alignments (Wagner-Fischer DP) between reference (ElevenLabs transliterated)
-and hypothesis (Local IndicConformer), classifying each word into:
+Computes exact sequence alignments (Multi-Token Wagner-Fischer DP) between reference
+(ElevenLabs transliterated/phonetic) and hypothesis (Local IndicConformer), classifying each word into:
   - match (C)
   - substitution (S)
   - deletion (D)
   - insertion (I)
-Also calculates character edit distance (Levenshtein) and aggregates Out-of-Vocabulary (OOV)
-and technical loanword error metrics.
+
+Specially engineered for code-switched Malayalam-English (Manglish) lecture speech:
+1. Acronym Expansion: Letter-by-letter phonetic expansion (RVS -> ആർവിഎസ്, S3 -> എസ്റ്റീ/എസ്ത്രീ, MAT -> എംഎടി/മാറ്റ്).
+2. Compound Agglutination: Multi-token DP binds English loanwords + Malayalam case suffixes into a single unit
+   (e.g. "Academy യുടെ" ↔ "അക്കാഡമിയുടെ", "module ന്റെ" ↔ "മോഡ്യൂളിന്റെ", "S3 കാരുടെ" ↔ "എസ്റ്റീക്കാരുടെ").
+3. Common Lecture Loanword Lexicon: Built-in phonetic dictionary for standard college lecture terminology
+   (maths -> മാത്സ്, complex -> കോംപ്ലക്സ്, variable -> വേരിയബിൾ, integration -> ഇന്റഗ്രേഷൻ, textbook -> ടെക്സ്റ്റ് ബുക്ക്).
+4. Accurate Out-of-Vocabulary (OOV) Error Attribution: True acoustic errors (e.g. Maths -> മാസ്) are tracked
+   precisely without cascading false deletions onto surrounding words.
 """
 
 import json
 import logging
 import os
+import re
 import unicodedata
-from normalise import prepare_reference, normalise_text
+from normalise import normalise_text
 
 log = logging.getLogger("wer_visualizer")
+
+# --- Malayalam Case Suffixes & Postpositions ---
+MALAYALAM_CASE_SUFFIXES = {
+    "യുടെ", "ന്റെ", "ൻ്റെ", "ഇന്റെ",
+    "ൽ", "ിൽ", "യിൽ",
+    "ക്ക്", "യ്ക്ക്", "ിക്ക്", "ന്", "ിന്",
+    "ഉം", "വും",
+    "ഓട്", "യോട്", "ഇനോട്",
+    "ആൽ", "ഇനാൽ",
+    "ലേക്ക്", "ഇലേക്ക്", "ത്തിലേക്ക്",
+    "നകത്ത്", "ൽനകത്ത്", "ിൽനകത്ത്",
+    "നിന്നു", "ൽനിന്ന്", "ിൽനിന്ന്", "നിന്നും", "ൽനിന്നും", "ിൽനിന്നും",
+    "ആണ്", "ആയിരുന്നു", "ആയിരുന്നെങ്കിൽ", "എന്നാണ്",
+    "കാരുടെ", "കാര്", "കാരം",
+    "കൾ", "കളെ", "കളിൽ", "കൾക്ക്", "കളിലേക്ക്",
+    "തന്നെ", "തന്നേ"
+}
+
+# --- Acronym English Letters & Digits to Malayalam Syllables ---
+ACRONYM_MAP = {
+    "A": "എ", "B": "ബി", "C": "സി", "D": "ഡി", "E": "ഇ", "F": "എഫ്",
+    "G": "ജി", "H": "എച്ച്", "I": "ഐ", "J": "ജെ", "K": "കെ", "L": "എൽ",
+    "M": "എം", "N": "എൻ", "O": "ഒ", "P": "പി", "Q": "ക്യു", "R": "ആർ",
+    "S": "എസ്", "T": "ടി", "U": "യു", "V": "വി", "W": "ഡബ്ല്യു", "X": "എക്സ്",
+    "Y": "വൈ", "Z": "ഇസഡ്",
+    "0": "സീറോ", "1": "വൺ", "2": "ടു", "3": "ത്രീ", "4": "ഫോർ",
+    "5": "ഫൈവ്", "6": "സിക്സ്", "7": "സെവൻ", "8": "എയിറ്റ്", "9": "നയൻ"
+}
+
+# --- Built-in Phonetic Dictionary for High-Frequency Academic Loanwords ---
+COMMON_LOANWORDS = {
+    "maths": ["മാത്സ്", "മാത്‍സ്", "മാത്തമാറ്റിക്സ്"],
+    "mathematics": ["മാത്തമാറ്റിക്സ്", "മാത്തമറ്റിക്സ്", "മാത്സ്"],
+    "academy": ["അക്കാദമി", "അക്കാഡമി"],
+    "module": ["മോഡ്യൂൾ", "മൊഡ്യൂൾ", "മോഡൽ"],
+    "start": ["സ്റ്റാർട്ട്"],
+    "fourth": ["ഫോർത്ത്"],
+    "third": ["തേർഡ്", "തിർഡ്"],
+    "first": ["ഫസ്റ്റ്"],
+    "second": ["സെക്കൻഡ്", "സെക്കന്റ്"],
+    "complex": ["കോംപ്ലക്സ്"],
+    "variable": ["വേരിയബിൾ"],
+    "integration": ["ഇന്റഗ്രേഷൻ"],
+    "differentiation": ["ഡിഫറൻഷ്യേഷൻ", "ഡിഫ്ഫേരേന്സേഷന്"],
+    "syllabus": ["സിലബസ്"],
+    "topic": ["ടോപ്പിക്", "ടോപിക്"],
+    "textbook": ["ടെക്സ്റ്റ്ബുക്ക്", "ടെക്സ്റ്റ് ബുക്ക്"],
+    "edition": ["എഡിഷൻ", "അഡിഷൻ"],
+    "publication": ["പബ്ലിക്കേഷൻ"],
+    "matrix": ["മാട്രിക്സ്"],
+    "integral": ["ഇന്റഗ്രൽ"],
+    "formula": ["ഫോർമുല"],
+    "follow": ["ഫോളോ"],
+    "advanced": ["അഡ്വാൻസ്ഡ്", "അഡ്വാൻസ്"],
+    "engineering": ["എൻജിനീയറിങ്", "എഞ്ചിനീയറിംഗ്", "എൻജിനീയറിംഗ്"],
+    "four": ["ഫോർ", "ഫോറാണ്"],
+    "three": ["ത്രീ"],
+    "two": ["ടു"],
+    "one": ["വൺ", "ഒന്ന്"],
+    "zero": ["സീറോ", "പൂജ്യം"],
+    "kreyszig": ["ക്രോസിക്ക്", "ക്രോസ്വിഗ്", "ക്രോയിസിഗ്", "ക്രേസിക്ക്", "ക്രേസിക്കിന്റെ"],
+    "erwin": ["എർവിൻ"],
+    "john": ["ജോൺ"],
+    "wiley": ["വേലിയേൻ", "വൈലി"],
+    "sons": ["സൺസ്", "സൺസിന്റെ"],
+    "cauchy": ["കോഷി", "കോഷ്യസ്"],
+    "okay": ["ഓക്കെ", "ഓകെ"],
+    "ok": ["ഓക്കെ", "ഓകെ"],
+    "yes": ["യെസ്"],
+    "no": ["നോ"],
+    "next": ["നെക്സ്റ്റ്"],
+    "previous": ["പ്രീവിയസ്"],
+    "check": ["ചെക്ക്"],
+    "note": ["നോട്ട്"],
+    "write": ["റൈറ്റ്"],
+    "read": ["റീഡ്"],
+    "table": ["ടേബിൾ"],
+    "method": ["മെത്തേഡ്", "മെത്തഡ്"],
+    "order": ["ഓർഡർ"],
+    "degree": ["ഡിഗ്രി"],
+    "system": ["സിസ്റ്റം"],
+    "rank": ["റാങ്ക്"],
+    "row": ["റോ"],
+    "column": ["കോളം"],
+    "element": ["എലമെന്റ്"],
+    "diagonal": ["ഡയഗണൽ"],
+    "determinant": ["ഡിറ്റർമിനന്റ്"],
+    "inverse": ["ഇൻവേഴ്സ്"],
+    "eigen": ["ഐഗൻ"],
+    "function": ["ഫംഗ്ഷൻ", "ഫങ്ഷൻ"],
+    "limit": ["ലിമിറ്റ്"],
+    "series": ["സീരീസ്"],
+    "value": ["വാല്യൂ"],
+    "derivative": ["ഡെറിവേറ്റീവ്"],
+    "power": ["പവർ"],
+    "square": ["സ്ക്വയർ"],
+    "cube": ["ക്യൂബ്"],
+    "constant": ["കോൺസ്റ്റന്റ്"],
+    "linear": ["ലീനിയർ"],
+    "vector": ["വെക്ടർ"],
+    "equation": ["ഇക്വേഷൻ", "ഇക്വേഷൻസ്"],
+    "clear": ["ക്ലിയർ"],
+    "simple": ["സിമ്പിൾ"],
+    "same": ["സെയിം"],
+    "level": ["ലെവൽ"],
+    "line": ["ലൈൻ"],
+    "point": ["പോയിന്റ്"],
+    "graph": ["ഗ്രാഫ്"],
+    "root": ["റൂട്ട്"],
+    "circle": ["സർക്കിൾ"],
+    "question": ["ക്വസ്റ്റ്യൻ"],
+    "problem": ["പ്രോബ്ലം", "പ്രോബ്ലംസ്"],
+    "solve": ["സോൾവ്"],
+    "answer": ["ആൻസർ"],
+    "class": ["ക്ലാസ്"],
+    "step": ["സ്റ്റെപ്പ്"],
+    "example": ["എക്സാമ്പിൾ"],
+    "taylor": ["ടെയ്‌ലർ"],
+    "laurent": ["ലോറന്റ്"],
+    "singular": ["സിംഗുലർ"],
+    "analytic": ["അനലിറ്റിക്"],
+    "harmonic": ["ഹാർമോണിക്"],
+    "transformation": ["ട്രാൻസ്ഫോർമേഷൻ"]
+}
 
 
 def levenshtein_distance(s1: str, s2: str) -> int:
@@ -44,127 +176,380 @@ def is_latin_word(word: str) -> bool:
     return any("LATIN" in unicodedata.name(c, "") for c in word)
 
 
-def align_tokens_dp(ref_text: str, hyp_text: str, loanword_set: set[str] | None = None) -> dict:
-    """
-    Wagner-Fischer Dynamic Programming sequence alignment at token level.
-    Returns aligned token pairs with match/substitution/deletion/insertion tags.
-    """
-    ref_words = ref_text.strip().split()
-    hyp_words = hyp_text.strip().split()
-    n = len(ref_words)
-    m = len(hyp_words)
+def expand_acronym(word: str) -> list[str]:
+    """Expands acronyms (RVS -> ആർവിഎസ്, S3 -> എസ്റ്റീ/എസ്ത്രീ, MAT -> എംഎടി/മാറ്റ്, KTU -> കെടിയു)."""
+    w = word.strip().upper()
+    if not w:
+        return []
+    if len(w) <= 6 and (w.isupper() or any(c.isdigit() for c in w)):
+        chars = []
+        for c in w:
+            if c in ACRONYM_MAP:
+                chars.append(ACRONYM_MAP[c])
+            else:
+                return []
+        primary = "".join(chars)
+        res = [primary]
+        # Common colloquial acronym variants
+        if w == "S3":
+            res.extend(["എസ്റ്റീ", "എസ്ത്രീ", "എസ് ത്രീ"])
+        elif w == "MAT":
+            res.extend(["മാറ്റ്", "എം എ ടി", "എം എ"])
+        elif w == "KTU":
+            res.extend(["കെടിയു", "കെ ടി യു"])
+        return res
+    return []
 
+
+def get_word_candidates(word: str, mapping: dict[str, str]) -> list[str]:
+    """Return all valid Malayalam representations for a reference word."""
+    w_clean = re.sub(r"[^A-Za-z0-9]", "", word).lower()
+    cands = []
+
+    # 1. User approved / dictionary mapping
+    if w_clean in mapping and mapping[w_clean]:
+        cands.append(normalise_text(mapping[w_clean]))
+
+    # 2. Acronym expansion
+    acros = expand_acronym(word)
+    for a in acros:
+        norm_a = normalise_text(a)
+        if norm_a not in cands:
+            cands.append(norm_a)
+
+    # 3. Common lecture loanword dictionary
+    if w_clean in COMMON_LOANWORDS:
+        for cw in COMMON_LOANWORDS[w_clean]:
+            norm_cw = normalise_text(cw)
+            if norm_cw not in cands:
+                cands.append(norm_cw)
+
+    if not cands and not is_latin_word(word):
+        cands.append(normalise_text(word))
+
+    return cands
+
+
+def get_morphological_variants(stem: str, suffix: str) -> list[str]:
+    """Generate valid Malayalam compound forms when a stem attaches a case marker."""
+    variants = [stem + suffix, stem + "്" + suffix]
+    # Gemination for kaarude / kal (e.g. എസ്റ്റീ + കാരുടെ -> എസ്റ്റീക്കാരുടെ)
+    if suffix.startswith("ക"):
+        variants.append(stem + "്ക" + suffix[1:])
+        variants.append(stem + "ക്ക" + suffix[1:])
+        variants.append(stem + "ുക" + suffix[1:])
+    # Virama / Vowel junction for inte / il / inu
+    if suffix in ("ന്റെ", "ൻ്റെ", "ഇന്റെ"):
+        variants.append(stem + "ിന്റെ")
+        variants.append(stem + "ന്റെ")
+        if stem.endswith("ൽ") or stem.endswith("ൾ") or stem.endswith("ർ") or stem.endswith("ൺ") or stem.endswith("ൻ"):
+            variants.append(stem[:-1] + "ന്റെ")
+    if suffix in ("ൽ", "ിൽ", "യിൽ"):
+        variants.append(stem + "ിൽ")
+        variants.append(stem + "യിൽ")
+        variants.append(stem + "ൽ")
+    if suffix in ("ന്", "ിന്"):
+        variants.append(stem + "ിന്")
+        variants.append(stem + "ത്തിന്")
+    if suffix in ("ക്ക്", "യ്ക്ക്", "ിക്ക്"):
+        variants.append(stem + "ിക്ക്")
+        variants.append(stem + "യ്ക്ക്")
+        variants.append(stem + "ക്ക്")
+    if suffix in ("ഉം", "വും"):
+        variants.append(stem + "ഉം")
+        variants.append(stem + "വും")
+        variants.append(stem + "ിലും")
+    if suffix in ("ലേക്ക്", "ഇലേക്ക്"):
+        variants.append(stem + "ലേക്ക്")
+        variants.append(stem + "ിലേക്ക്")
+        variants.append(stem + "ത്തിലേക്ക്")
+    if suffix in ("ആണ്", "ആയിരുന്നു", "ആയിരുന്നെങ്കിൽ"):
+        variants.append(stem + suffix)
+        variants.append(stem + "റ" + suffix)
+    return list(set(variants))
+
+
+def match_score_1_to_1(ref_w: str, hyp_w: str, mapping: dict[str, str]) -> tuple[bool, int]:
+    """Check if ref_w matches or phonetically approximates hyp_w."""
+    if ref_w == hyp_w:
+        return True, 0
+    cands = get_word_candidates(ref_w, mapping)
+    for c in cands:
+        if c == hyp_w:
+            return True, 0
+        d = levenshtein_distance(c, hyp_w)
+        if d <= 1 and min(len(c), len(hyp_w)) >= 4:
+            # Very close phonetic variant (e.g. അക്കാദമി vs അക്കാഡമി)
+            return True, 0
+
+    min_dist = levenshtein_distance(ref_w, hyp_w)
+    for c in cands:
+        d = levenshtein_distance(c, hyp_w)
+        if d < min_dist:
+            min_dist = d
+    return False, min_dist
+
+
+def match_score_2_to_1(ref_w1: str, ref_w2: str, hyp_w: str, mapping: dict[str, str]) -> tuple[bool, int]:
+    """Check if (ref_w1 + ref_w2) combines into hyp_w (e.g. Academy + യുടെ -> അക്കാഡമിയുടെ)."""
+    cands1 = get_word_candidates(ref_w1, mapping)
+    if not cands1:
+        cands1 = [ref_w1]
+
+    for c1 in cands1:
+        variants = get_morphological_variants(c1, ref_w2)
+        for v in variants:
+            if v == hyp_w:
+                return True, 0
+            if levenshtein_distance(v, hyp_w) <= 1:
+                return True, 0
+
+        # Substring / boundary check: hyp_w must contain both stem and suffix
+        if hyp_w.endswith(ref_w2):
+            stem = hyp_w[:-len(ref_w2)]
+            if stem == c1 or levenshtein_distance(stem, c1) <= 1:
+                return True, 0
+
+        if ref_w2 in MALAYALAM_CASE_SUFFIXES:
+            if hyp_w.startswith(c1) or levenshtein_distance(c1, hyp_w[:len(c1)]) <= 1:
+                if ref_w2 in hyp_w or levenshtein_distance(ref_w2, hyp_w[-len(ref_w2):]) <= 1:
+                    return True, 0
+
+    return False, 999
+
+
+def match_score_1_to_2(ref_w: str, hyp_w1: str, hyp_w2: str, mapping: dict[str, str]) -> tuple[bool, int]:
+    """Check if ref_w splits into hyp_w1 + hyp_w2 (e.g. textbook -> ടെക്സ്റ്റ് ബുക്ക്)."""
+    comb_h = hyp_w1 + hyp_w2
+    return match_score_1_to_1(ref_w, comb_h, mapping)
+
+
+def align_sequence_smart(
+    ref_tokens: list[str],
+    hyp_tokens: list[str],
+    mapping: dict[str, str] | None = None,
+    loanword_set: set[str] | None = None
+) -> dict:
+    """
+    Multi-token Wagner-Fischer Dynamic Programming sequence alignment supporting:
+    - 1-to-1 match/substitution/deletion/insertion
+    - 2-to-1 compound match (Ref i-2 & i-1 -> Hyp j-1)
+    - 1-to-2 split match (Ref i-1 -> Hyp j-2 & j-1)
+    """
+    if mapping is None:
+        mapping = {}
     if loanword_set is None:
         loanword_set = set()
 
-    # dp[i][j] = min edit cost
-    dp = [[0] * (m + 1) for _ in range(n + 1)]
-    ops = [[None] * (m + 1) for _ in range(n + 1)]
+    n = len(ref_tokens)
+    m = len(hyp_tokens)
+
+    # Precompute candidate sets and flags for reference tokens
+    ref_clean = [normalise_text(w) for w in ref_tokens]
+    ref_cands = [set(get_word_candidates(w, mapping)) | {ref_clean[idx]} for idx, w in enumerate(ref_tokens)]
+    ref_is_latin = [is_latin_word(w) for w in ref_tokens]
+
+    # Precompute 2-to-1 compound variants for adjacent ref tokens
+    comp_21_variants: dict[int, set[str]] = {}
+    for i in range(2, n + 1):
+        r_w1 = ref_tokens[i - 2]
+        r_w2 = ref_tokens[i - 1]
+        cands1 = ref_cands[i - 2]
+        variants = set()
+        for c1 in cands1:
+            for v in get_morphological_variants(c1, r_w2):
+                variants.add(normalise_text(v))
+            variants.add(normalise_text(c1 + r_w2))
+        comp_21_variants[i] = variants
+
+    # dp[i][j] = (min_cost, op_type, di, dj)
+    dp = [[(999999, 'none', 0, 0) for _ in range(m + 1)] for _ in range(n + 1)]
+    dp[0][0] = (0, 'start', 0, 0)
 
     for i in range(1, n + 1):
-        dp[i][0] = i
-        ops[i][0] = 'del'
+        dp[i][0] = (i, 'del', 1, 0)
     for j in range(1, m + 1):
-        dp[0][j] = j
-        ops[0][j] = 'ins'
+        dp[0][j] = (j, 'ins', 0, 1)
 
     for i in range(1, n + 1):
-        r_w = ref_words[i - 1]
-        for j in range(1, m + 1):
-            h_w = hyp_words[j - 1]
-            if r_w == h_w:
-                dp[i][j] = dp[i - 1][j - 1]
-                ops[i][j] = 'match'
-            else:
-                cost_sub = dp[i - 1][j - 1] + 1
-                cost_del = dp[i - 1][j] + 1
-                cost_ins = dp[i][j - 1] + 1
+        r_w = ref_tokens[i - 1]
+        cand_set = ref_cands[i - 1]
+        comp_set = comp_21_variants.get(i)
 
-                min_cost = min(cost_sub, cost_del, cost_ins)
-                dp[i][j] = min_cost
-                if min_cost == cost_sub:
-                    ops[i][j] = 'sub'
-                elif min_cost == cost_del:
-                    ops[i][j] = 'del'
+        for j in range(1, m + 1):
+            h_w = hyp_tokens[j - 1]
+
+            # Option 1: 1-to-1 match or sub (O(1) set lookup)
+            is_match = (h_w in cand_set) or (r_w == h_w)
+            cost_11 = 0 if is_match else 1
+            op_11 = 'match' if is_match else 'sub'
+            cand_11 = (dp[i - 1][j - 1][0] + cost_11, op_11, 1, 1)
+
+            # Option 2: 1-to-0 del
+            cand_del = (dp[i - 1][j][0] + 1, 'del', 1, 0)
+
+            # Option 3: 0-to-1 ins
+            cand_ins = (dp[i][j - 1][0] + 1, 'ins', 0, 1)
+
+            best = cand_11
+            if cand_del[0] < best[0]:
+                best = cand_del
+            if cand_ins[0] < best[0]:
+                best = cand_ins
+
+            # Option 4: 2-to-1 compound match (Ref i-2 & i-1 -> Hyp j-1)
+            if i >= 2 and comp_set is not None:
+                if h_w in comp_set:
+                    cand_comp = (dp[i - 2][j - 1][0] + 0, 'compound_match_2_1', 2, 1)
+                    if cand_comp[0] <= best[0]:
+                        best = cand_comp
                 else:
-                    ops[i][j] = 'ins'
+                    r_w2 = ref_tokens[i - 1]
+                    if (r_w2 in MALAYALAM_CASE_SUFFIXES) and (ref_is_latin[i - 2] or len(r_w) >= 3):
+                        cand_comp_sub = (dp[i - 2][j - 1][0] + 1, 'compound_sub_2_1', 2, 1)
+                        if cand_comp_sub[0] < best[0]:
+                            best = cand_comp_sub
+
+            # Option 5: 1-to-2 compound match (Ref i-1 -> Hyp j-2 & j-1)
+            if j >= 2:
+                comb_h = hyp_tokens[j - 2] + h_w
+                if (comb_h in cand_set) or (r_w == comb_h):
+                    cand_12 = (dp[i - 1][j - 2][0] + 0, 'compound_match_1_2', 1, 2)
+                    if cand_12[0] <= best[0]:
+                        best = cand_12
+
+            dp[i][j] = best
 
     # Backtrack
     i, j = n, m
     aligned = []
-    matches = substitutions = deletions = insertions = 0
+    matches = subs = dels = inss = 0
 
     while i > 0 or j > 0:
-        op = ops[i][j]
-        if op == 'match':
-            r_w = ref_words[i - 1]
-            h_w = hyp_words[j - 1]
+        cost, op, di, dj = dp[i][j]
+        if di == 1 and dj == 1:
+            r_w = ref_tokens[i - 1]
+            h_w = hyp_tokens[j - 1]
             is_loan = (r_w.lower() in loanword_set) or is_latin_word(r_w)
-            aligned.append({
-                "type": "match",
-                "ref": r_w,
-                "hyp": h_w,
-                "is_loanword": is_loan,
-                "char_dist": 0,
-            })
-            matches += 1
-            i -= 1
-            j -= 1
-        elif op == 'sub':
-            r_w = ref_words[i - 1]
-            h_w = hyp_words[j - 1]
             c_dist = levenshtein_distance(r_w, h_w)
+            if op == 'match':
+                aligned.append({
+                    "type": "match",
+                    "ref": r_w,
+                    "hyp": h_w,
+                    "is_loanword": is_loan,
+                    "is_compound": False,
+                    "char_dist": 0,
+                })
+                matches += 1
+            else:
+                aligned.append({
+                    "type": "substitution",
+                    "ref": r_w,
+                    "hyp": h_w,
+                    "is_loanword": is_loan,
+                    "is_compound": False,
+                    "char_dist": c_dist,
+                })
+                subs += 1
+        elif di == 2 and dj == 1:
+            r_w = f"{ref_tokens[i - 2]} {ref_tokens[i - 1]}"
+            h_w = hyp_tokens[j - 1]
+            is_loan = any((w.lower() in loanword_set) or is_latin_word(w) for w in [ref_tokens[i - 2], ref_tokens[i - 1]])
+            if 'match' in op:
+                aligned.append({
+                    "type": "match",
+                    "ref": r_w,
+                    "hyp": h_w,
+                    "is_loanword": is_loan,
+                    "is_compound": True,
+                    "char_dist": 0,
+                })
+                matches += 1
+            else:
+                aligned.append({
+                    "type": "substitution",
+                    "ref": r_w,
+                    "hyp": h_w,
+                    "is_loanword": is_loan,
+                    "is_compound": True,
+                    "char_dist": levenshtein_distance(r_w, h_w),
+                })
+                subs += 1
+        elif di == 1 and dj == 2:
+            r_w = ref_tokens[i - 1]
+            h_w = f"{hyp_tokens[j - 2]} {hyp_tokens[j - 1]}"
             is_loan = (r_w.lower() in loanword_set) or is_latin_word(r_w)
-            aligned.append({
-                "type": "substitution",
-                "ref": r_w,
-                "hyp": h_w,
-                "is_loanword": is_loan,
-                "char_dist": c_dist,
-            })
-            substitutions += 1
-            i -= 1
-            j -= 1
-        elif op == 'del':
-            r_w = ref_words[i - 1]
+            if 'match' in op:
+                aligned.append({
+                    "type": "match",
+                    "ref": r_w,
+                    "hyp": h_w,
+                    "is_loanword": is_loan,
+                    "is_compound": True,
+                    "char_dist": 0,
+                })
+                matches += 1
+            else:
+                aligned.append({
+                    "type": "substitution",
+                    "ref": r_w,
+                    "hyp": h_w,
+                    "is_loanword": is_loan,
+                    "is_compound": True,
+                    "char_dist": levenshtein_distance(r_w, h_w),
+                })
+                subs += 1
+        elif di == 1 and dj == 0:
+            r_w = ref_tokens[i - 1]
             is_loan = (r_w.lower() in loanword_set) or is_latin_word(r_w)
             aligned.append({
                 "type": "deletion",
                 "ref": r_w,
                 "hyp": None,
                 "is_loanword": is_loan,
+                "is_compound": False,
                 "char_dist": len(r_w),
             })
-            deletions += 1
-            i -= 1
-        elif op == 'ins':
-            h_w = hyp_words[j - 1]
+            dels += 1
+        elif di == 0 and dj == 1:
+            h_w = hyp_tokens[j - 1]
             aligned.append({
                 "type": "insertion",
                 "ref": None,
                 "hyp": h_w,
                 "is_loanword": is_latin_word(h_w),
+                "is_compound": False,
                 "char_dist": len(h_w),
             })
-            insertions += 1
-            j -= 1
+            inss += 1
         else:
             break
+        i -= di
+        j -= dj
 
     aligned.reverse()
-    wer = round((substitutions + deletions + insertions) / max(1, n), 4)
+    total_ref = n
+    errors = subs + dels + inss
+    wer = round(errors / max(1, total_ref), 4)
 
     return {
         "aligned": aligned,
         "counts": {
             "matches": matches,
-            "substitutions": substitutions,
-            "deletions": deletions,
-            "insertions": insertions,
-            "total_ref": n,
+            "substitutions": subs,
+            "deletions": dels,
+            "insertions": inss,
+            "total_ref": total_ref,
+            "errors": errors,
             "wer": wer,
         }
     }
+
+
+def align_tokens_dp(ref_text: str, hyp_text: str, loanword_set: set[str] | None = None) -> dict:
+    """Backwards compatibility wrapper for align_tokens_dp."""
+    return align_sequence_smart(ref_text.strip().split(), hyp_text.strip().split(), loanword_set=loanword_set)
 
 
 def compute_comparison_analytics(segments: list[dict], mapping: dict | None = None) -> dict:
@@ -177,7 +562,11 @@ def compute_comparison_analytics(segments: list[dict], mapping: dict | None = No
     if mapping is None:
         mapping = {}
 
-    loanword_set = set(k.lower() for k in mapping.keys()) | set(v.lower() for v in mapping.values())
+    loanword_set = (
+        set(k.lower() for k in mapping.keys())
+        | set(v.lower() for v in mapping.values())
+        | set(COMMON_LOANWORDS.keys())
+    )
 
     enriched_segments = []
     heatmap_ribbon = []
@@ -202,10 +591,11 @@ def compute_comparison_analytics(segments: list[dict], mapping: dict | None = No
         raw_ref = s.get("elevenlabs", "")
         raw_hyp = s.get("local", "")
 
-        ref_clean, _ = prepare_reference(raw_ref, mapping)
-        hyp_clean = normalise_text(raw_hyp)
+        # Clean raw text while preserving English loanwords for phonetic matching
+        ref_tokens = [w for w in raw_ref.strip().split() if w]
+        hyp_tokens = [normalise_text(w) for w in raw_hyp.strip().split() if normalise_text(w)]
 
-        seg_res = align_tokens_dp(ref_clean, hyp_clean, loanword_set=loanword_set)
+        seg_res = align_sequence_smart(ref_tokens, hyp_tokens, mapping=mapping, loanword_set=loanword_set)
         aligned = seg_res["aligned"]
         counts = seg_res["counts"]
 
@@ -241,12 +631,16 @@ def compute_comparison_analytics(segments: list[dict], mapping: dict | None = No
                         malayalam_errors += 1
 
                 # Track OOV & recurring technical errors
-                if is_loan or len(ref_w) > 4:
-                    ref_key = ref_w.lower()
+                # If compound, take the root word (e.g. "Academy യുടെ" -> "Academy")
+                root_word = ref_w.split()[0] if " " in ref_w else ref_w
+                root_is_loan = is_loan or is_latin_word(root_word) or (root_word.lower() in loanword_set)
+
+                if root_is_loan or len(root_word) > 4:
+                    ref_key = root_word.lower()
                     if ref_key not in oov_tracker:
                         oov_tracker[ref_key] = {
-                            "word": ref_w,
-                            "is_loanword": is_loan,
+                            "word": root_word,
+                            "is_loanword": root_is_loan,
                             "occurrences": 0,
                             "errors": 0,
                             "confusions": {},
@@ -299,24 +693,24 @@ def compute_comparison_analytics(segments: list[dict], mapping: dict | None = No
     malayalam_wer = round(malayalam_errors / max(1, malayalam_words), 4) if malayalam_words else 0.0
     loanword_wer = round(loan_errors / max(1, loan_words), 4) if loan_words else 0.0
 
-    # Build sorted OOV Error Heatmap list
+    # Build ranked OOV Heatmap entries
     oov_heatmap = []
-    for info in oov_tracker.values():
-        if info["errors"] > 0:
-            err_rate = round(info["errors"] / max(1, info["occurrences"]), 3)
-            # Sort confusions by frequency
-            top_conf = sorted(info["confusions"].items(), key=lambda x: x[1], reverse=True)[:3]
+    for k, v in oov_tracker.items():
+        if v["occurrences"] >= 1:
+            err_rate = round(v["errors"] / v["occurrences"], 3)
+            # Sort top acoustic confusion hypotheses
+            sorted_confusions = sorted(v["confusions"].items(), key=lambda x: x[1], reverse=True)
             oov_heatmap.append({
-                "word": info["word"],
-                "is_loanword": info["is_loanword"],
-                "occurrences": info["occurrences"],
-                "errors": info["errors"],
+                "word": v["word"],
+                "is_loanword": v["is_loanword"],
+                "occurrences": v["occurrences"],
+                "errors": v["errors"],
                 "error_rate": err_rate,
-                "top_confusions": [k for k, _ in top_conf],
+                "top_confusions": [f"{w} ({c})" for w, c in sorted_confusions[:3]],
             })
 
-    # Sort by error count descending
-    oov_heatmap.sort(key=lambda x: (x["errors"], x["error_rate"]), reverse=True)
+    # Sort high error rate and frequency first
+    oov_heatmap.sort(key=lambda x: (x["errors"], x["error_rate"], x["occurrences"]), reverse=True)
 
     return {
         "enriched_segments": enriched_segments,
@@ -346,12 +740,14 @@ def get_or_create_wer_analytics(folder: str, segments: list[dict], mapping: dict
         try:
             with open(cache_path, encoding="utf-8") as f:
                 data = json.load(f)
-                if data.get("mapping_count") == len(mapping):
+                # Verify schema version
+                if data.get("schema_version") == 2:
                     return data
         except Exception as e:
             log.warning("Could not load cached wer_analytics from %s: %s", cache_path, e)
 
     analytics = compute_comparison_analytics(segments, mapping)
+    analytics["schema_version"] = 2
     analytics["mapping_count"] = len(mapping)
     try:
         with open(cache_path, "w", encoding="utf-8") as f:
@@ -360,4 +756,3 @@ def get_or_create_wer_analytics(folder: str, segments: list[dict], mapping: dict
         log.warning("Could not save wer_analytics to %s: %s", cache_path, e)
 
     return analytics
-

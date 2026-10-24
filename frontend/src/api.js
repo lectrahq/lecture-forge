@@ -74,6 +74,9 @@ export const audioUrl = (id) => `/api/jobs/${encodeURIComponent(id)}/audio`;
 // Stream URL for HTML5 in-browser audio playback with Range headers
 export const streamAudioUrl = (id) => `/api/jobs/${encodeURIComponent(id)}/stream-audio`;
 
+// Normalized amplitude envelope points for interactive waveform visualization
+export const getJobWaveform = (id) => request(`/api/jobs/${encodeURIComponent(id)}/waveform`);
+
 // The English-to-Malayalam spelling table, commonest words first.
 export const getEnglishMap = () => request("/api/english-map");
 

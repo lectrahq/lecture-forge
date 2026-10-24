@@ -51,6 +51,7 @@ from transcriber import (TranscriptionError, api_key_configured,  # noqa: E402
 from export_dataset import (create_dataset_archive, export_dataset,  # noqa: E402
                             get_dataset_summary, list_datasets)
 from audio_health import get_cached_health  # noqa: E402
+from waveform import get_or_create_waveform  # noqa: E402
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 log = logging.getLogger("jobs")
@@ -520,6 +521,10 @@ def run_job(job_id: str) -> None:
                         seg_count = len(json.load(f))
                 except Exception:
                     pass
+            try:
+                get_or_create_waveform(folder, wav_path)
+            except Exception:
+                pass
             db.update_job(job_id, status="done", segment_count=seg_count)
             log.info("[%s] done (local model only, %s segments)", job_id, seg_count)
             return
@@ -559,9 +564,13 @@ def run_job(job_id: str) -> None:
         if engine == "both":
             run_local_on_segments(job_id, folder, wav_path, segments, keep_clips=wants_clips)
 
-        # 6. Pre-calculate acoustic health profile for the audio
+        # 6. Pre-calculate acoustic health profile and waveform for the audio
         try:
             get_cached_health(folder, recompute=False)
+        except Exception:
+            pass
+        try:
+            get_or_create_waveform(folder, wav_path)
         except Exception:
             pass
 
@@ -1155,6 +1164,18 @@ def get_audio(job_id: str, inline: bool = False):
 def stream_audio(job_id: str):
     """Stream the full 16 kHz mono WAV for in-browser HTML5 playback with Range seeking support."""
     return get_audio(job_id, inline=True)
+
+
+@app.get("/api/jobs/{job_id}/waveform")
+def api_get_waveform(job_id: str):
+    """Retrieve normalized amplitude envelope points for interactive waveform visualization."""
+    get_job_or_404(job_id)
+    folder = job_dir(job_id)
+    wav_path = os.path.join(folder, "audio.wav")
+    if not os.path.isfile(wav_path):
+        raise HTTPException(status_code=404, detail="Audio file not available for this job.")
+    peaks = get_or_create_waveform(folder, wav_path)
+    return {"job_id": job_id, "peaks": peaks}
 
 
 @app.get("/api/jobs/{job_id}/transcript")

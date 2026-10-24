@@ -27,6 +27,7 @@ import {
   uploadFile,
 } from "./api.js";
 import { THEMES, applyTheme, loadTheme, saveTheme } from "./theme.js";
+import { WaveformScrubber } from "./WaveformScrubber.jsx";
 
 const POLL_MS = 3000;
 const FINAL = ["done", "failed"];
@@ -1476,17 +1477,19 @@ function FullAudioPlayer({
     }));
   }
 
-  function handleSeekStart(e) {
+  function handleSeekStart(valOrEvent) {
+    const val = typeof valOrEvent === "number" ? valOrEvent : parseFloat(valOrEvent.target.value);
     setIsSeeking(true);
-    setSeekValue(parseFloat(e.target.value));
+    setSeekValue(val);
   }
 
-  function handleSeekChange(e) {
-    setSeekValue(parseFloat(e.target.value));
+  function handleSeekChange(valOrEvent) {
+    const val = typeof valOrEvent === "number" ? valOrEvent : parseFloat(valOrEvent.target.value);
+    setSeekValue(val);
   }
 
-  function handleSeekEnd(e) {
-    const target = parseFloat(e.target.value);
+  function handleSeekEnd(valOrEvent) {
+    const target = typeof valOrEvent === "number" ? valOrEvent : parseFloat(valOrEvent.target.value);
     setIsSeeking(false);
     setCurrentTime(target);
     if (audioRef.current) {
@@ -1550,28 +1553,19 @@ function FullAudioPlayer({
       </div>
 
       <div className="player-main-controls">
-        {/* Full-width Scrubber */}
+        {/* Full-width Waveform Scrubber */}
         <div className="player-timeline-wrap">
           <span className="player-time-label elapsed">{formatTime(effectiveCurrent)}</span>
-          <div className="player-scrubber-track">
-            <input
-              type="range"
-              className="player-scrubber"
-              min="0"
-              max={effectiveDuration || 100}
-              step="0.1"
-              value={effectiveCurrent}
-              onMouseDown={handleSeekStart}
-              onTouchStart={handleSeekStart}
-              onChange={handleSeekChange}
-              onMouseUp={handleSeekEnd}
-              onTouchEnd={handleSeekEnd}
-              style={{
-                background: `linear-gradient(to right, var(--accent) ${progressPercent}%, var(--border-firm) ${progressPercent}%)`
-              }}
-              aria-label="Seek time"
-            />
-          </div>
+          <WaveformScrubber
+            jobId={job.job_id}
+            currentTime={effectiveCurrent}
+            duration={effectiveDuration}
+            isSeeking={isSeeking}
+            seekValue={seekValue}
+            onSeekStart={handleSeekStart}
+            onSeekChange={handleSeekChange}
+            onSeekEnd={handleSeekEnd}
+          />
           <span className="player-time-label total">{formatTime(effectiveDuration)}</span>
         </div>
 

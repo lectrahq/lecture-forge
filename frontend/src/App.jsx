@@ -1536,14 +1536,15 @@ function FullAudioPlayer({
         <div className="player-status-badge">
           <span className={`pulse-indicator ${isPlaying ? "active" : ""}`} />
           <span className="player-title-text">
-            <strong>Full Lecture Audio</strong>
+            <strong className="player-title-full">Full Lecture Audio</strong>
+            <strong className="player-title-mobile">Full Audio</strong>
             <span className="player-format-tag"> (WAV, 16 kHz Mono)</span>
           </span>
-          {effectiveDuration > 0 && <span className="muted small">· {formatTime(effectiveDuration)}</span>}
+          {effectiveDuration > 0 && <span className="player-duration-text">· {formatTime(effectiveDuration)}</span>}
         </div>
         <div className="player-top-actions">
           <a href={audioUrl(job.job_id)} download className="player-download-btn" title="Download uncompressed WAV">
-            <IconDownload /> <span>Download WAV</span>
+            <IconDownload /> <span className="player-download-full">Download WAV</span><span className="player-download-mobile">WAV</span>
           </a>
         </div>
       </div>

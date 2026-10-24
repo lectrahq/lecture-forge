@@ -3129,12 +3129,28 @@ button.alt:hover {
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1), 0 0 0 1px var(--accent-soft);
 }
 
+.player-title-mobile {
+  display: none;
+}
+
+.player-download-mobile {
+  display: none;
+}
+
+.player-duration-text {
+  color: var(--text-soft);
+  font-size: 0.78rem;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
 .player-top-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  flex-wrap: wrap;
   gap: 10px;
+  width: 100%;
 }
 
 .player-status-badge {
@@ -3295,8 +3311,8 @@ button.alt:hover {
   display: flex;
   align-items: center;
   gap: 10px;
-  flex: 1 1 240px;
-  min-width: 200px;
+  width: 100%;
+  flex: none; /* CRITICAL: Never stretch vertically inside a column flex container */
 }
 
 .player-time-label {
@@ -3881,24 +3897,54 @@ button.alt:hover {
     border-radius: 6px;
   }
 
-  /* Audio Player: Compact, Well-Proportioned & No Wasted Space */
+  /* Audio Player: Compact, Perfectly Proportioned, 100% Zero-Waste Layout */
   .full-audio-player {
-    padding: 10px 10px;
-    gap: 8px;
-    margin: 8px 0 10px;
+    padding: 8px 10px;
+    gap: 4px;
+    margin: 6px 0 8px;
     border-radius: 10px;
+  }
+  .player-title-full {
+    display: none;
+  }
+  .player-title-mobile {
+    display: inline;
+  }
+  .player-download-full {
+    display: none;
+  }
+  .player-download-mobile {
+    display: inline;
   }
   .player-top-row {
     display: flex;
     align-items: center;
     justify-content: space-between;
+    flex-wrap: nowrap !important; /* NEVER wrap to a second line */
     gap: 6px;
-    margin-bottom: 2px;
+    width: 100%;
+    margin-bottom: 0;
   }
   .player-status-badge {
-    font-size: 0.76rem;
-    gap: 6px;
+    font-size: 0.74rem;
+    gap: 5px;
     min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    display: flex;
+    align-items: center;
+  }
+  .player-title-text {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .player-duration-text {
+    font-size: 0.70rem;
+    color: var(--text-soft);
+    white-space: nowrap;
+    flex-shrink: 0;
   }
   .player-format-tag {
     display: none; /* Hide heavy parenthetical on mobile */
@@ -3906,74 +3952,122 @@ button.alt:hover {
   .player-top-actions {
     gap: 4px;
     flex-shrink: 0;
+    margin-left: auto;
   }
   .player-download-btn {
-    font-size: 0.70rem;
-    padding: 2px 8px;
-    min-height: 26px;
+    font-size: 0.68rem;
+    padding: 2px 7px;
+    height: 24px !important;
+    min-height: 24px !important;
     border-radius: var(--r-full);
+    gap: 3px;
+    white-space: nowrap;
+  }
+  .player-download-btn svg {
+    width: 12px;
+    height: 12px;
   }
   .player-main-controls {
     display: flex;
     flex-direction: column;
-    gap: 5px; /* Tight, proportional spacing between scrubber and controls */
+    gap: 3px; /* Tight, proportional spacing between scrubber and controls */
+    width: 100%;
   }
   .player-timeline-wrap {
     width: 100%;
     display: flex;
     align-items: center;
     gap: 6px;
+    flex: none !important; /* CRITICAL: Never stretch vertically in flex column */
+    height: 18px;
+    margin: 0;
+    padding: 0;
   }
   .player-time-label {
-    font-size: 0.70rem;
-    min-width: 34px;
+    font-size: 0.68rem;
+    min-width: 32px;
+    line-height: 1;
+    margin: 0;
+    padding: 0;
+  }
+  .player-scrubber-track {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    height: 14px;
+    margin: 0;
+    padding: 0;
   }
   .player-scrubber {
-    height: 6px;
+    height: 4px;
+    margin: 0;
+    padding: 0;
+    border: none;
   }
   .player-scrubber::-webkit-slider-thumb {
-    width: 15px;
-    height: 15px;
+    width: 14px;
+    height: 14px;
+  }
+  .player-scrubber::-moz-range-thumb {
+    width: 14px;
+    height: 14px;
   }
   .player-controls-row {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 6px;
+    gap: 4px;
     width: 100%;
-    margin-top: 2px;
+    margin-top: 1px;
+    flex-wrap: nowrap;
   }
   .player-speed-pills {
     padding: 1px;
     gap: 1px;
     border-radius: 6px;
+    display: inline-flex;
+    align-items: center;
+    flex-shrink: 0;
   }
   .player-speed-btn {
-    padding: 2px 5px;
-    font-size: 0.66rem;
-    min-height: 24px;
+    padding: 2px 4px;
+    font-size: 0.64rem;
+    height: 22px !important;
+    min-height: 22px !important;
     border-radius: 4px;
     font-weight: 600;
+    line-height: 1;
+    box-shadow: none !important;
   }
   .player-center-btns {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: 4px;
+    flex-shrink: 0;
   }
   .player-big-play-btn {
-    width: 36px;
-    height: 36px;
+    width: 34px !important;
+    height: 34px !important;
+    min-height: 34px !important;
+    border-radius: 50% !important;
+    padding: 0 !important;
   }
   .player-big-play-btn svg {
-    width: 16px;
-    height: 16px;
+    width: 15px;
+    height: 15px;
   }
   .player-skip-btn {
-    height: 28px;
-    padding: 0 6px;
-    font-size: 0.70rem;
-    min-height: 28px;
+    height: 26px !important;
+    min-height: 26px !important;
+    padding: 0 5px !important;
+    font-size: 0.68rem;
     border-radius: 6px;
+    line-height: 1;
+    gap: 2px;
+  }
+  .player-skip-btn svg {
+    width: 12px;
+    height: 12px;
   }
   .player-volume-wrap {
     display: none !important; /* Phones use hardware rocker buttons */
@@ -4535,22 +4629,24 @@ button.alt:hover {
     font-size: 0.62rem;
   }
   .player-speed-btn {
-    padding: 2px 4px;
-    font-size: 0.62rem;
-    min-height: 22px;
+    padding: 2px 3px;
+    font-size: 0.60rem;
+    height: 20px !important;
+    min-height: 20px !important;
   }
   .player-center-btns {
-    gap: 4px;
+    gap: 3px;
   }
   .player-skip-btn {
-    height: 26px;
-    padding: 0 4px;
-    font-size: 0.66rem;
-    min-height: 26px;
+    height: 24px !important;
+    min-height: 24px !important;
+    padding: 0 4px !important;
+    font-size: 0.62rem;
   }
   .player-big-play-btn {
-    width: 34px;
-    height: 34px;
+    width: 32px !important;
+    height: 32px !important;
+    min-height: 32px !important;
   }
 }
 

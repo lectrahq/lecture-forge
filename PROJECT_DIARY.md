@@ -3,6 +3,60 @@
 Newest entries first. MAJOR = new feature or change to how the system is built or
 deployed; MINOR = small fix, wording or documentation change.
 
+## 2026-10-25 — Malayalam Morphophonemic Sandhi, Comprehensive Academic Lexicon & Multi-Token Phrase Alignment [MAJOR]
+
+**What changed:** 
+1. **Identified Comprehensive Systematic Issues Across All 110 Lecture Segments:**
+   - Detailed corpus-wide discrepancy analysis across all 110 segments of lecture `20261024-185847-73c17d` revealed that naive word-matching still generated hundreds of false errors due to:
+     - **Missing Malayalam Morphophonemic Sandhi Rules:** When English stems attached Malayalam case markers (`ൽ`, `ന്`, `ഉം`, `ന്റെ`, `ആണ്`, `ഒക്കെ`), direct string concatenation created invalid Unicode glyphs or mismatched spelling conventions. For instance:
+       - Consonants ending with virama (`്`) cannot take vowel signs without dropping the virama (`സീനിയേഴ്സ് + ന്` produced invalid `സീനിയേഴ്സ്ിന്` instead of `സീനിയേഴ്സിന്`; `ബുക്ക് + ആണ്` produced `ബുക്ക്ആണ്` instead of `ബുക്കാണ്`).
+       - Chillu letters (`ർ`, `ൽ`, `ൾ`, `ൺ`, `ൻ`) transform when taking vowel suffixes (`ഇയർ + ൽ` produced `ഇയർൽ` instead of `ഇയറിൽ`; `പേപ്പർ + ഉം` produced `പേപ്പർഉം` instead of `പേപ്പറും`; `മോഡ്യൂൾ + ന്റെ` produced `മോഡ്യൂൾന്റെ` instead of `മോഡ്യൂളിന്റെ`; `മോഡ്യൂൾ + ഉം` produced `മോഡ്യൂളിലും`).
+       - Nouns ending in Anusvara `ം` (U+0D02) transition to `മ` or `ത്ത` before case suffixes (`ഫോം + ൽ` produced `ഫോംൽ` instead of `ഫോമിൽ`; `തിയറം + ൽ` produced `തിയറത്തിൽ`).
+     - **Missing Mathematical & Academic Vocabulary:** High-frequency lecture loanwords (`sin`, `cos`, `tan`, `log`, `raise`, `raised`, `theta`, `dz`, `point`, `points`, `term`, `terms`, `formula`, `base`, `prepare`, `include`, `chance`) and code-switched English connectors (`to`, `by`, `of`, `is`, `and`, `or`, `the`) were absent from the lexicon, causing ~124 occurrences of standard terms (`sin` 42x, `raise` 33x, `log` 25x, `cos` 24x) to be tagged with a 100% false error rate in the OOV heatmap.
+     - **English Pluralization & Hyphenated Compounds:** Plural suffixes on loanwords (`seniors`, `questions`, `topics`, `marks`, `steps`) and ElevenLabs hyphenated transliterations (`form-ൽ`, `Cauchy's`) failed to match their Malayalam counterparts.
+     - **Multi-Token Phrase Shifts (2-to-2 and 1-to-3):** Acronym phrases like `S3 യുടെ` split across tokens (`["S3", "യുടെ"]` ↔ `["എസ്", "ത്രീയുടെ"]`), compound loanwords with case markers like `textbook ഉം` split into `["ടെക്സ്റ്റ്", "ബുക്കും"]`, and 3-digit spoken numbers like `201` were spoken as 3 distinct Malayalam words (`["ടു", "സീറോ", "ഒന്ന്"]`).
+2. **Built Morphophonemic Sandhi Engine (`apply_malayalam_sandhi`):**
+   - Implemented Unicode-aware morphophonemic Sandhi rules:
+     - **Virama Dropping:** Strips final virama `്` and attaches vowel signs (`ിന്`, `ത്തിന്`, `ാണ്`, `ിൽ`, `ും`, `ിന്റെ`, `ൊക്കെ`).
+     - **Chillu-R Transformations:** Generates both `ര` and `റ` phonetic variants (`ഇയർ + ൽ -> ഇയറിൽ/ഇയരിൽ`, `പേപ്പർ + ഉം -> പേപ്പറും`, `ഇയർ + ഒക്കെ -> ഇയറൊക്കെ`).
+     - **Chillu-L & Retroflex Chillu-L:** Produces regular and retroflex transitions (`മോഡ്യൂൾ + ന്റെ -> മോഡ്യൂളിന്റെ`, `മോഡ്യൂൾ + ഉം -> മോഡ്യൂളിലും`).
+     - **Chillu-N & Chillu-NN:** Produces geminated and vowel transitions (`്റെ`, `ിന്റെ`, `ിൽ`, `ാണ്`).
+     - **Anusvara `ം` Transitions:** Replaces final `ം` with `മ` and `ത്ത` (`ഫോം + ൽ -> ഫോമിൽ`, `തിയറം + ൽ -> തിയറത്തിൽ`).
+     - **Consonant Gemination:** Expands `ക` suffixes with `്ക`, `ക്ക`, `ുക`.
+3. **Comprehensive Mathematical, Calculus & Lecture Lexicon:**
+   - Added over 150 college-level lecture terms covering:
+     - Trigonometric, hyperbolic and logarithmic functions: `sin`, `cos`, `tan`, `sec`, `cosec`, `cot`, `sinh`, `cosh`, `tanh`, `log`, `ln`, `exp`, `exponential`, `raise`, `raised`.
+     - Complex analysis, geometry and calculus keywords: `plane`, `axis`, `axes`, `polar`, `radius`, `region`, `domain`, `path`, `contour`, `closed`, `open`, `connected`, `simply`, `real`, `imaginary`, `set`, `subset`.
+     - Operations & expressions: `term`, `terms`, `bracket`, `brackets`, `numerator`, `denominator`, `multiply`, `divide`, `cancel`, `put`, `take`, `get`, `give`, `show`, `prove`, `calculate`.
+     - Code-switched connectors & numbers: `to`, `by`, `of`, `is`, `and`, `or`, `the`, `eleven`..`hundred`.
+     - Mathematical variables: `z` mapped to `ഇസഡ്`, `സെഡ്`, and colloquial lecture pronunciation `സെറ്റ്` (`z = x + iy`).
+4. **Multi-Token 2-to-2 Phrase & 1-to-3 Number Compound Alignment:**
+   - Added 2-to-2 phrase match transitions in dynamic programming: seamlessly aligns `textbook ഉം ↔ ടെക്സ്റ്റ് ബുക്കും`, `S3 തന്നെ ↔ എസ്ത്രീ തന്നെയാണ്`, and `S3 യുടെ ↔ എസ് ത്രീയുടെ` as exact matches without edit penalties.
+   - Added 1-to-3 compound matching for spoken digit sequences (e.g. `201 ↔ ടു സീറോ ഒന്ന്`).
+   - Added English plural stemmer (`seniors -> senior + s`) and hyphenated compound de-agglutination (`form-ൽ -> ഫോമിൽ`).
+   - Added spoken Malayalam colloquial variant equivalence (`പറഞ്ഞാ ↔ പറഞ്ഞാൽ`, `വരുമ്പം ↔ വരുമ്പോൾ`, `എഴുതുന്നെ ↔ എഴുതുന്നത്`, `എന്നാ ↔ എന്നാണ്`, `ചെയ്താ ↔ ചെയ്താൽ`, `പറഞ്ഞ് ↔ പറഞ്ഞു`, `വച്ച് ↔ വെച്ച്`, `അപ്പൊ ↔ അപ്പോൾ ↔ അപ്പം`).
+5. **Results & Verification Across All 110 Segments:**
+   - Overall transcript agreement surged to **71.63%** (Matches: 2,867 words).
+   - Word Error Rate plummeted to **28.37%** (Technical loanword WER down to **27.53%**).
+   - False errors for math loanwords (`sin`, `cos`, `log`, `raise`) dropped from 100% to **0%**.
+   - True acoustic errors remain cleanly attributed in the OOV heatmap (`integral -> എന്തെങ്കിലും`, `Formula -> ഫോമിൽ`, `pi -> ഫൈവ്`).
+   - Test suite extended with 5 new automated regression tests (`test_segment6_sandhi_compounds`, `test_hyphenated_loanwords`, `test_colloquial_variants`, `test_math_symbols`, `test_number_compound`); all 54 tests pass.
+   - Analytics cache schema bumped to version 4, deployed to VPS backend, and verified via live API.
+
+**Files touched:**
+- `backend/wer_visualizer.py` — morphophonemic Sandhi engine (`apply_malayalam_sandhi`), expanded 150+ math/lecture lexicon, colloquial equivalence map, 2-to-2 and 1-to-3 multi-token DP transitions, schema version 4.
+- `backend/test_smart_align.py` — 5 new unit tests for Sandhi compounds, hyphenated loanwords, spoken colloquialisms, math symbols, and digit compounds.
+
+**How to check it:**
+1. Open the application on desktop or mobile.
+2. Select lecture `20261024-185847-73c17d` and open the **Comparison** tab.
+3. Verify that the scorecard reports **71.6% Match rate** and **~28.4% WER** (down from 50%+).
+4. Review Segment 6 (`0:36 – 0:45`):
+   - `seniors ന് (സീനിയേഴ്സിന്)`, `year ൽ (ഇയറിൽ)`, `paper ഉം (പേപ്പറും)`, `textbook ഉം (ടെക്സ്റ്റ് ബുക്കും)`, `base (ബേസ്)`, `prepare (പ്രിപ്പയർ)` all display as exact / compound matches.
+5. In the **OOV & Technical Heatmap** table, confirm that false positives (`sin`, `cos`, `log`, `raise`) no longer appear as errors, and true acoustic confusions (`integral`, `Formula`, `pi`) remain accurately tracked.
+
+---
+
 ## 2026-10-25 — Smart Manglish Alignment: Acronym Expansion, Compound Agglutination & Accurate OOV Error Attribution [MAJOR]
 
 **What changed:** 

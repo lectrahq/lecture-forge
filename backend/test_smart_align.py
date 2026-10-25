@@ -107,6 +107,31 @@ class TestSmartWerAlignment(unittest.TestCase):
         res = align_sequence_smart(ref.split(), hyp.split(), {})
         self.assertEqual(res["counts"]["errors"], 0)
 
+    def test_bilingual_unlisted_loanwords(self):
+        # Tests arbitrary unlisted technical terms that are NOT in COMMON_LOANWORDS
+        ref = "thermodynamics resistor capacitor eigenvalue distribution chapter simplify choice reverse"
+        hyp = "തെർമോഡൈനാമിക്സ് റെസിസ്റ്റർ കപ്പാസിറ്റർ ഐഗൻവാല്യൂ ഡിസ്ട്രിബ്യൂഷൻ ചാപ്റ്റർ സിംപ്ലിഫൈ ചോയ്സ് റിവേഴ്സ്"
+        res = align_sequence_smart(ref.split(), hyp.split(), {})
+        self.assertEqual(res["counts"]["errors"], 0)
+        self.assertEqual(res["counts"]["matches"], len(ref.split()))
+
+    def test_nakathu_and_past_tense_sandhi(self):
+        # Tests Integration + നകത്ത് -> ഇന്റഗ്രേഷനകത്ത്, Differentiation + ആയിരുന്നെങ്കിൽ -> ഡിഫറൻഷ്യേഷനായിരുന്നെങ്കിൽ
+        ref = "Integration നകത്ത് Differentiation ആയിരുന്നെങ്കിൽ resistor ൽ"
+        hyp = "ഇന്റഗ്രേഷനകത്ത് ഡിഫറൻഷ്യേഷനായിരുന്നെങ്കിൽ റെസിസ്റ്ററിൽ"
+        res = align_sequence_smart(ref.split(), hyp.split(), {})
+        self.assertEqual(res["counts"]["errors"], 0)
+        self.assertEqual(res["counts"]["matches"], 3)
+
+    def test_negative_confusions_remain_errors(self):
+        # Tests that acoustic confusions (Maths -> മാസ്, integral -> എന്തെങ്കിലും, pi -> ഫൈവ്)
+        # are correctly flagged as errors and NOT falsely matched
+        ref = "Maths integral pi"
+        hyp = "മാസ് എന്തെങ്കിലും ഫൈവ്"
+        res = align_sequence_smart(ref.split(), hyp.split(), {})
+        self.assertEqual(res["counts"]["matches"], 0)
+        self.assertEqual(res["counts"]["substitutions"], 3)
+
 if __name__ == "__main__":
     unittest.main()
 

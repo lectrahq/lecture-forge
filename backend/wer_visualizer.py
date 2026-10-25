@@ -493,6 +493,122 @@ def is_latin_word(word: str) -> bool:
     return any("LATIN" in unicodedata.name(c, "") for c in word)
 
 
+# --- Bilingual Phonetic Matcher (G2P Consonant Skeleton Alignment) ---
+# Allows any arbitrary English technical loanword in Latin script to phonetically match its
+# Malayalam transcription dynamically without requiring manual dictionary curation.
+
+MALAYALAM_LIGATURES = [
+    ("റ്റ", "tt"),
+    ("ന്റ", "nt"),
+    ("ണ്ട", "nd"),
+    ("മ്പ", "mp"),
+    ("ഞ്ച", "nch"),
+    ("ങ്ക", "nk"),
+    ("ദ്ധ", "d"),
+    ("ഗ്ഗ", "g"),
+    ("ബ്ബ", "b"),
+    ("പ്പ", "p"),
+    ("ക്ക", "k"),
+    ("ച്ച", "ch"),
+    ("ട്ട", "t"),
+    ("മ്മ", "m"),
+    ("ന്ന", "n"),
+    ("ല്ല", "l"),
+    ("വ്വ", "v"),
+    ("സ്സ", "s"),
+]
+
+MALAYALAM_CONSONANT_MAP = {
+    # Velar
+    "ക": "k", "ഖ": "k", "ഗ": "g", "ഘ": "g", "ങ": "ng",
+    # Palatal
+    "ച": "ch", "ഛ": "ch", "ജ": "j", "ഝ": "j", "ഞ": "nj",
+    # Retroflex
+    "ട": "t", "ഠ": "t", "ഡ": "d", "ഢ": "d", "ണ": "n",
+    # Dental
+    "ത": "t", "ഥ": "t", "ദ": "d", "ധ": "d", "ന": "n",
+    # Labial
+    "പ": "p", "ഫ": "f", "ബ": "b", "ഭ": "b", "മ": "m",
+    # Semivowels & Liquids
+    "യ": "y", "ര": "r", "റ": "r", "ല": "l", "ള": "l", "ഴ": "r", "വ": "v",
+    # Fricatives
+    "ശ": "sh", "ഷ": "sh", "സ": "s", "ഹ": "h",
+    # Chillus
+    "ർ": "r", "ൽ": "l", "ൾ": "l", "ൺ": "n", "ൻ": "n", "ൿ": "k", "ം": "m"
+}
+
+
+def malayalam_to_phonetic_skeleton(text: str) -> str:
+    """Converts Malayalam text into a normalized phonetic consonant skeleton."""
+    t = text
+    for lig, rep in MALAYALAM_LIGATURES:
+        t = t.replace(lig, rep)
+        
+    out = []
+    for c in t:
+        if c in MALAYALAM_CONSONANT_MAP:
+            out.append(MALAYALAM_CONSONANT_MAP[c])
+        elif 'a' <= c <= 'z':
+            out.append(c)
+            
+    res = "".join(out)
+    # Strip epenthetic glide 'y' (യ) which Malayalam uses to represent English diphthongs/vowels
+    res = res.replace("y", "")
+    res = re.sub(r"(.)\1+", r"\1", res)
+    return res
+
+
+def english_to_phonetic_skeleton(text: str) -> str:
+    """Converts an English word into a normalized phonetic consonant skeleton."""
+    w = text.lower().strip(".,;:?!'\"-()")
+    
+    # Morphological endings
+    w = re.sub(r"ture\b", "chr", w)
+    w = re.sub(r"stion\b", "stn", w)
+    w = re.sub(r"tion|sion", "shn", w)
+    w = re.sub(r"\bsur", "shr", w)
+    
+    # Multi-letter patterns using placeholders
+    w = re.sub(r"ch", "\u0001", w)
+    w = re.sub(r"sh", "\u0002", w)
+    w = re.sub(r"th", "\u0003", w)
+    w = re.sub(r"ph", "f", w)
+    w = re.sub(r"qu", "kv", w)
+    w = re.sub(r"ck", "k", w)
+    w = re.sub(r"wh", "v", w)
+    w = re.sub(r"dg", "j", w)
+    
+    # Contextual consonants
+    w = re.sub(r"c(?=[eiy])", "s", w)
+    w = re.sub(r"c", "k", w)
+    w = re.sub(r"g(?=[eiy])", "j", w)
+    w = re.sub(r"x", "ks", w)
+    w = re.sub(r"w", "v", w)
+    w = re.sub(r"z", "s", w)
+    
+    # Restore multi-letter patterns
+    w = w.replace("\u0001", "ch").replace("\u0002", "sh").replace("\u0003", "t")
+    
+    # Strip vowels and glides
+    out = [c for c in w if c not in "aeiouy"]
+    res = "".join(out)
+    res = re.sub(r"(.)\1+", r"\1", res)
+    return res
+
+
+def phonetic_similarity(eng_word: str, mal_word: str) -> float:
+    """Compute normalized phonetic similarity [0.0 - 1.0] between an English word and a Malayalam word."""
+    ep = english_to_phonetic_skeleton(eng_word)
+    mp = malayalam_to_phonetic_skeleton(mal_word)
+    if not ep or not mp:
+        return 0.0
+    if ep == mp:
+        return 1.0
+    dist = levenshtein_distance(ep, mp)
+    max_len = max(len(ep), len(mp))
+    return 1.0 - (dist / max_len)
+
+
 def expand_acronym(word: str) -> list[str]:
     """Expands acronyms (RVS -> ആർവിഎസ്, S3 -> എസ്റ്റീ/എസ്ത്രീ, MAT -> എംഎടി/മാറ്റ്, KTU -> കെടിയു)."""
     w = word.strip().upper()
@@ -535,6 +651,10 @@ def apply_malayalam_sandhi(stem: str, suffix: str) -> list[str]:
             res.extend([base_cons + "ിന്", base_cons + "ത്തിന്", stem + "ിന്"])
         elif suffix in ("ആണ്", "ആ"):
             res.extend([base_cons + "ാണ്", base_cons + "ആണ്"])
+        elif suffix in ("ആയിരുന്നു", "ആയിരുന്നെങ്കിൽ", "ആയി", "ആയിട്ട്"):
+            res.extend([base_cons + "ായിരുന്നു", base_cons + "ായിരുന്നെങ്കിൽ", base_cons + "ായി", base_cons + "ായിട്ട്"])
+        elif suffix in ("നകത്ത്", "അകത്ത്", "ൽനകത്ത്"):
+            res.extend([base_cons + "ിനകത്ത്", base_cons + "നകത്ത്", stem + "നകത്ത്"])
         elif suffix in ("ൽ", "ിൽ", "യിൽ"):
             res.extend([base_cons + "ിൽ", base_cons + "ൽ"])
         elif suffix in ("ഉം", "വും"):
@@ -557,6 +677,10 @@ def apply_malayalam_sandhi(stem: str, suffix: str) -> list[str]:
             res.extend([root + "റിന്റെ", root + "രിന്റെ", stem + "ിന്റെ"])
         elif suffix in ("ആണ്", "ആ"):
             res.extend([root + "രാണ്", root + "റാണ്"])
+        elif suffix in ("ആയിരുന്നു", "ആയിരുന്നെങ്കിൽ", "ആയി", "ആയിട്ട്"):
+            res.extend([root + "രായിരുന്നു", root + "റായിരുന്നു", root + "രായി", root + "റായി", stem + "ആയിരുന്നു"])
+        elif suffix in ("നകത്ത്", "അകത്ത്"):
+            res.extend([root + "രിനകത്ത്", root + "റിനകത്ത്", stem + "നകത്ത്"])
         elif suffix in ("ന്", "ിന്"):
             res.extend([root + "രിന്", root + "റിന്", stem + "ിന്"])
         elif suffix in ("ഒക്കെ", "ഒക്കെയും"):
@@ -575,6 +699,10 @@ def apply_malayalam_sandhi(stem: str, suffix: str) -> list[str]:
             res.extend([root + l_char + "ിലും", root + l_char + "ും"])
         elif suffix in ("ആണ്", "ആ"):
             res.extend([root + l_char + "ാണ്", stem + "ാണ്"])
+        elif suffix in ("ആയിരുന്നു", "ആയിരുന്നെങ്കിൽ", "ആയി", "ആയിട്ട്"):
+            res.extend([root + l_char + "ായിരുന്നു", root + l_char + "ായിരുന്നെങ്കിൽ", root + l_char + "ായി", stem + "ആയിരുന്നു"])
+        elif suffix in ("നകത്ത്", "അകത്ത്"):
+            res.extend([root + l_char + "ിനകത്ത്", root + l_char + "നകത്ത്", stem + "നകത്ത്"])
         elif suffix in ("ന്", "ിന്"):
             res.extend([root + l_char + "ിന്", stem + "ിന്"])
         elif suffix in ("ഒക്കെ", "ഒക്കെയും"):
@@ -590,6 +718,10 @@ def apply_malayalam_sandhi(stem: str, suffix: str) -> list[str]:
             res.extend([root + n_char + "ിൽ"])
         elif suffix in ("ആണ്", "ആ"):
             res.extend([root + n_char + "ാണ്"])
+        elif suffix in ("നകത്ത്", "അകത്ത്", "ൽനകത്ത്"):
+            res.extend([root + "നകത്ത്", root + n_char + "ിനകത്ത്", root + n_char + "കത്ത്", stem + "നകത്ത്"])
+        elif suffix in ("ആയിരുന്നു", "ആയിരുന്നെങ്കിൽ", "ആയി", "ആയിട്ട്"):
+            res.extend([root + n_char + "ായിരുന്നു", root + n_char + "ായിരുന്നെങ്കിൽ", root + n_char + "ായി", root + n_char + "ായിട്ട്", stem + "ആയിരുന്നു"])
         elif suffix in ("ഒക്കെ", "ഒക്കെയും"):
             res.extend([root + n_char + "ൊക്കെ", stem + "ഒക്കെ"])
 
@@ -602,6 +734,10 @@ def apply_malayalam_sandhi(stem: str, suffix: str) -> list[str]:
             res.extend([base + "മും", base + "ത്തും", stem + "ും"])
         elif suffix in ("ആണ്", "ആ"):
             res.extend([base + "മാണ്", base + "ത്താണ്"])
+        elif suffix in ("ആയിരുന്നു", "ആയിരുന്നെങ്കിൽ", "ആയി", "ആയിട്ട്"):
+            res.extend([base + "മായിരുന്നു", base + "ത്തായിരുന്നു", base + "മായിരുന്നെങ്കിൽ", stem + "ആയിരുന്നു"])
+        elif suffix in ("നകത്ത്", "അകത്ത്"):
+            res.extend([base + "മിനകത്ത്", base + "ത്തിനകത്ത്", stem + "നകത്ത്"])
         elif suffix in ("ന്റെ", "ൻ്റെ", "ഇന്റെ"):
             res.extend([base + "മിന്റെ", base + "ത്തിന്റെ", stem + "ന്റെ"])
         elif suffix in ("ന്", "ിന്"):
@@ -696,6 +832,9 @@ def match_score_1_to_1(ref_w: str, hyp_w: str, mapping: dict[str, str]) -> tuple
             # Very close phonetic variant (e.g. അക്കാദമി vs അക്കാഡമി)
             return True, 0
 
+    if is_latin_word(ref_w) and phonetic_similarity(ref_w, hyp_w) >= 0.75:
+        return True, 0
+
     min_dist = levenshtein_distance(ref_w, hyp_w)
     for c in cands:
         d = levenshtein_distance(c, hyp_w)
@@ -727,6 +866,14 @@ def match_score_2_to_1(ref_w1: str, ref_w2: str, hyp_w: str, mapping: dict[str, 
         if ref_w2 in MALAYALAM_CASE_SUFFIXES:
             if hyp_w.startswith(c1) or levenshtein_distance(c1, hyp_w[:len(c1)]) <= 1:
                 if ref_w2 in hyp_w or levenshtein_distance(ref_w2, hyp_w[-len(ref_w2):]) <= 1:
+                    return True, 0
+
+    # Bilingual phonetic compound check
+    if is_latin_word(ref_w1):
+        for sfx in [ref_w2, "ി" + ref_w2, "ത്തി" + ref_w2, "ിന്റെ", "ന്റെ", "ിൽ", "ൽ", "നകത്ത്", "ിനകത്ത്", "ാണ്", "ായിരുന്നു", "ായിരുന്നെങ്കിൽ"]:
+            if hyp_w.endswith(sfx) and len(hyp_w) > len(sfx):
+                stem = hyp_w[:-len(sfx)]
+                if phonetic_similarity(ref_w1, stem) >= 0.75:
                     return True, 0
 
     return False, 999
@@ -766,18 +913,23 @@ def align_sequence_smart(
     ref_cands = [set(get_word_candidates(w, mapping)) | {ref_norm[idx]} for idx, w in enumerate(ref_tokens)]
     ref_is_latin = [is_latin_word(w) for w in ref_tokens]
 
-    # Precompute 2-to-1 compound variants for adjacent ref tokens
+    # Precompute 2-to-1 compound variants & 2-to-2 phrase variants for adjacent ref tokens
     comp_21_variants: dict[int, set[str]] = {}
+    phrase_22_variants: dict[int, set[str]] = {}
     for i in range(2, n + 1):
         r_w1 = ref_tokens[i - 2]
         r_w2 = ref_tokens[i - 1]
         cands1 = ref_cands[i - 2]
         variants = set()
+        p_set = set()
         for c1 in cands1:
             for v in apply_malayalam_sandhi(c1, r_w2):
-                variants.add(normalise_text(v))
+                v_norm = normalise_text(v)
+                variants.add(v_norm)
+                p_set.add(v_norm.replace(" ", ""))
             variants.add(normalise_text(c1 + r_w2))
         comp_21_variants[i] = variants
+        phrase_22_variants[i] = p_set
 
     # dp[i][j] = (min_cost, op_type, di, dj)
     dp = [[(999999, 'none', 0, 0) for _ in range(m + 1)] for _ in range(n + 1)]
@@ -798,8 +950,19 @@ def align_sequence_smart(
             h_w = hyp_tokens[j - 1]
             h_norm = hyp_norm[j - 1]
 
-            # Option 1: 1-to-1 match or sub
+            # Option 1: 1-to-1 match or sub (with Dynamic Bilingual Phonetic Matching)
             is_match = (h_norm in cand_set) or (r_norm == h_norm)
+            if not is_match and ref_is_latin[i - 1]:
+                if "-" in r_w:
+                    r_stem, r_sfx = r_w.split("-", 1)
+                    for sfx in [r_sfx, "ി" + r_sfx, "ിൽ", "ൽ", "ിലും", "ന്റെ", "ിന്റെ"]:
+                        if h_norm.endswith(sfx) and len(h_norm) > len(sfx):
+                            stem = h_norm[:-len(sfx)]
+                            if phonetic_similarity(r_stem, stem) >= 0.75:
+                                is_match = True
+                                break
+                if not is_match:
+                    is_match = (phonetic_similarity(r_w, h_norm) >= 0.75)
             cost_11 = 0 if is_match else 1
             op_11 = 'match' if is_match else 'sub'
             cand_11 = (dp[i - 1][j - 1][0] + cost_11, op_11, 1, 1)
@@ -817,14 +980,52 @@ def align_sequence_smart(
                 best = cand_ins
 
             # Option 4: 2-to-1 compound match (Ref i-2 & i-1 -> Hyp j-1)
-            if i >= 2 and comp_set is not None:
-                if h_norm in comp_set:
+            if i >= 2:
+                r_w1 = ref_tokens[i - 2]
+                r_w2 = ref_tokens[i - 1]
+                is_comp_match = False
+                if comp_set is not None and h_norm in comp_set:
+                    is_comp_match = True
+                elif ref_is_latin[i - 2]:
+                    # Dynamic bilingual phonetic compound check
+                    sfx_list = [
+                        (r_w2, ""),
+                        ("ി" + r_w2, ""),
+                        ("ത്തി" + r_w2, ""),
+                        ("ിന്റെ", ""),
+                        ("ന്റെ", ""),
+                        ("ൽ", ""),
+                        ("ിൽ", ""),
+                        ("നകത്ത്", ""),
+                        ("ിനകത്ത്", "ൽ"),
+                        ("ിനകത്തു", "ൽ"),
+                        ("ാണ്", ""),
+                        ("ായിരുന്നു", ""),
+                        ("ായിരുന്നെങ്കിൽ", ""),
+                    ]
+                    if r_w2.startswith("ആ"):
+                        rest = r_w2[1:]
+                        sfx_list.extend([
+                            ("നാ" + rest, "ൻ"),
+                            ("ലാ" + rest, "ൽ"),
+                            ("രാ" + rest, "ർ"),
+                            ("മാ" + rest, "ം"),
+                            ("വാ" + rest, ""),
+                            ("യാ" + rest, ""),
+                        ])
+                    for sfx, restore_char in sfx_list:
+                        if h_norm.endswith(sfx) and len(h_norm) > len(sfx):
+                            stem = h_norm[:-len(sfx)] + restore_char
+                            if phonetic_similarity(r_w1, stem) >= 0.75:
+                                is_comp_match = True
+                                break
+
+                if is_comp_match:
                     cand_comp = (dp[i - 2][j - 1][0] + 0, 'compound_match_2_1', 2, 1)
                     if cand_comp[0] <= best[0]:
                         best = cand_comp
                 else:
-                    r_w2 = ref_tokens[i - 1]
-                    if (r_w2 in MALAYALAM_CASE_SUFFIXES or r_w2 in ("ആ", "ആണ്")) and (ref_is_latin[i - 2] or len(r_w) >= 3):
+                    if (r_w2 in MALAYALAM_CASE_SUFFIXES or r_w2 in ("ആ", "ആണ്")) and (ref_is_latin[i - 2] or len(r_w1) >= 3):
                         cand_comp_sub = (dp[i - 2][j - 1][0] + 1, 'compound_sub_2_1', 2, 1)
                         if cand_comp_sub[0] < best[0]:
                             best = cand_comp_sub
@@ -833,7 +1034,10 @@ def align_sequence_smart(
             if j >= 2:
                 comb_h = hyp_norm[j - 2] + h_norm
                 comb_h_space = hyp_norm[j - 2] + " " + h_norm
-                if (comb_h in cand_set) or (comb_h_space in cand_set) or (r_norm == comb_h):
+                is_12_match = (comb_h in cand_set) or (comb_h_space in cand_set) or (r_norm == comb_h)
+                if not is_12_match and ref_is_latin[i - 1]:
+                    is_12_match = (phonetic_similarity(r_w, comb_h) >= 0.75)
+                if is_12_match:
                     cand_12 = (dp[i - 1][j - 2][0] + 0, 'compound_match_1_2', 1, 2)
                     if cand_12[0] <= best[0]:
                         best = cand_12
@@ -848,16 +1052,10 @@ def align_sequence_smart(
                 elif ref_tokens[i - 2].upper() == "S3" and ("എസ് ത്രീ" in h_phrase or "എസ്ത്രീ" in h_phrase):
                     is_phrase_match = True
                 else:
-                    r1_cands = ref_cands[i - 2]
-                    r2 = ref_tokens[i - 1]
-                    for c1 in r1_cands:
-                        for s_var in apply_malayalam_sandhi(c1, r2):
-                            s_clean = normalise_text(s_var)
-                            if s_clean == h_phrase or s_clean.replace(" ", "") == h_phrase.replace(" ", ""):
-                                is_phrase_match = True
-                                break
-                        if is_phrase_match:
-                            break
+                    h_flat = h_phrase.replace(" ", "")
+                    p_set = phrase_22_variants.get(i)
+                    if p_set and h_flat in p_set:
+                        is_phrase_match = True
 
                 if is_phrase_match:
                     cand_22 = (dp[i - 2][j - 2][0] + 0, 'phrase_match_2_2', 2, 2)
@@ -1220,14 +1418,14 @@ def get_or_create_wer_analytics(folder: str, segments: list[dict], mapping: dict
         try:
             with open(cache_path, encoding="utf-8") as f:
                 data = json.load(f)
-                # Verify schema version
-                if data.get("schema_version") == 4:
+                # Verify schema version (5 = Bilingual Phonetic Matcher)
+                if data.get("schema_version") == 5:
                     return data
         except Exception as e:
             log.warning("Could not load cached wer_analytics from %s: %s", cache_path, e)
 
     analytics = compute_comparison_analytics(segments, mapping)
-    analytics["schema_version"] = 4
+    analytics["schema_version"] = 5
     analytics["mapping_count"] = len(mapping)
     try:
         with open(cache_path, "w", encoding="utf-8") as f:
